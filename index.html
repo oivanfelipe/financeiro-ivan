@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orçamento Ivan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 28px 28px 32px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: #111;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      background: transparent;
+      color: #555;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn.active { background: #2a2a2a; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Header ── */
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; color: #fff; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 28px; }
+
+    /* ── Form (aba Orçamento) ── */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+    select, input[type="number"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      color: #f0f0f0;
+      font-size: 15px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+    select:focus, input[type="number"]:focus { border-color: #3b82f6; }
+    select option { background: #1a1a1a; color: #f0f0f0; }
+    select:disabled { opacity: 0.4; cursor: not-allowed; }
+    .field { margin-bottom: 20px; }
+    .valor-wrap { position: relative; }
+    .valor-wrap span {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%); color: #666; font-size: 15px; pointer-events: none;
+    }
+    .valor-wrap input { padding-left: 34px; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .orcamento-hint { font-size: 12px; color: #555; margin-top: 7px; }
+    .orcamento-hint span { color: #888; }
+
+    /* ── Botão principal ── */
+    button.btn-primary {
+      width: 100%;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      margin-top: 4px;
+    }
+    button.btn-primary:hover { background: #2563eb; }
+    button.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Aba Contas ── */
+    .contas-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .contas-total-label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; }
+    .contas-total-val { font-size: 22px; font-weight: 700; color: #fff; }
+    .contas-total-val span { font-size: 13px; font-weight: 400; color: #555; margin-right: 4px; }
+
+    .conta-item {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      transition: border-color 0.15s;
+    }
+    .conta-item.pago {
+      opacity: 0.45;
+      border-color: #1a3a1a;
+    }
+    .conta-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .conta-info { flex: 1; min-width: 0; }
+    .conta-nome {
+      font-size: 15px;
+      font-weight: 500;
+      color: #f0f0f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .conta-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 3px;
+    }
+    .conta-venc {
+      font-size: 12px;
+      color: #555;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+    .badge-hoje  { background: #451a03; color: #fb923c; }
+    .badge-vence { background: #1e1b4b; color: #818cf8; }
+    .badge-pago  { background: #14532d; color: #4ade80; }
+    .badge-vencido { background: #450a0a; color: #f87171; }
+    .conta-orc {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .btn-pagar {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-pagar:hover { background: #2563eb; }
+    .btn-pago-icon {
+      color: #4ade80;
+      font-size: 20px;
+      flex-shrink: 0;
+      width: 36px;
+      text-align: center;
+    }
+
+    /* ── Inline pay form ── */
+    .pay-form {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #2a2a2a;
+    }
+    .pay-form.open { display: block; }
+    .pay-form-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .pay-input-wrap { position: relative; flex: 1; }
+    .pay-input-wrap span {
+      position: absolute; left: 12px; top: 50%;
+      transform: translateY(-50%); color: #666; font-size: 14px; pointer-events: none;
+    }
+    .pay-input-wrap input {
+      padding: 10px 10px 10px 32px;
+      font-size: 14px;
+      border-radius: 8px;
+    }
+    .pay-input-wrap input:focus { border-color: #3b82f6; }
+    .btn-confirmar {
+      background: #22c55e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 16px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn-confirmar:hover { background: #16a34a; }
+    .btn-cancelar {
+      background: #2a2a2a;
+      color: #888;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-cancelar:hover { background: #333; color: #ccc; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #22c55e;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 40px;
+      font-size: 14px; font-weight: 500;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 100; white-space: nowrap;
+    }
+    .toast.error { background: #ef4444; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    .divider { border: none; border-top: 1px solid #222; margin: 4px 0 16px; }
+    .contas-empty { text-align: center; color: #444; font-size: 14px; padding: 32px 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('orcamento')">Orçamento</button>
+      <button class="tab-btn" onclick="switchTab('contas')">Contas</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         ABA: ORÇAMENTO
+    ═══════════════════════════════════════════ -->
+    <div id="tab-orcamento" class="tab-content active">
+      <h1>Orçamento Agosto</h1>
+      <p class="subtitle">Setembro (gastos de agosto)</p>
+
+      <div class="field">
+        <label>Categoria</label>
+        <select id="categoria" onchange="filtrarItens()">
+          <option value="" disabled selected>Selecione uma categoria...</option>
+          <option value="Casa">🏠 Casa</option>
+          <option value="Streaming e assinaturas">📺 Streaming e assinaturas</option>
+          <option value="Parcelas casa">🛋️ Parcelas casa</option>
+          <option value="Alimentação">🛒 Alimentação</option>
+          <option value="Carro">🚗 Carro</option>
+          <option value="Pessoal">🧍 Pessoal</option>
+          <option value="Melina">👧 Melina</option>
+          <option value="Baby">🍼 Baby</option>
+          <option value="Financeiro">💰 Financeiro</option>
+          <option value="Presentes">🎁 Presentes</option>
+          <option value="Lazer">🎉 Lazer</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Item</label>
+        <select id="item" disabled onchange="mostrarOrcamento()">
+          <option value="" disabled selected>Selecione a categoria primeiro...</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Valor gasto (R$)</label>
+        <div class="valor-wrap">
+          <span>R$</span>
+          <input type="number" id="valor" placeholder="0,00" step="0.01" min="0" />
+        </div>
+        <div class="orcamento-hint" id="hint"></div>
+      </div>
+
+      <button class="btn-primary" id="btn" onclick="enviar()">Salvar na planilha</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         ABA: CONTAS
+    ═══════════════════════════════════════════ -->
+    <div id="tab-contas" class="tab-content">
+      <h1>Contas</h1>
+      <p class="subtitle">Agosto 2026 — vencimentos do mês</p>
+
+      <div class="contas-total">
+        <div>
+          <div class="contas-total-label">Total a pagar</div>
+          <div class="contas-total-val" id="total-val"><span>R$</span>—</div>
+        </div>
+        <div style="text-align:right">
+          <div class="contas-total-label">Pagas</div>
+          <div style="font-size:15px; font-weight:600; color:#4ade80" id="total-pagas">0 / 0</div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <div id="contas-lista"></div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzGQftthcXrzx5RLzIZOGHGJM1yB6mL0-2P2cVJoTHZ5VZp7a7J7YvSZS_b-eEgvbxf/exec";
+
+    // ─── Dados: Orçamento ───────────────────────────────────────────────────
+    const ITENS = {
+      "Casa": [
+        { row: 2,  nome: "Aluguel",             orc: 1746.09 },
+        { row: 3,  nome: "Condomínio",           orc: 650.00 },
+        { row: 4,  nome: "Conta de energia",     orc: 150.00 },
+        { row: 5,  nome: "Aluguel antigo",       orc: 398.00 },
+        { row: 6,  nome: "Conta de gás",         orc: 50.00  },
+        { row: 7,  nome: "Conta de internet",    orc: 100.00 },
+      ],
+      "Streaming e assinaturas": [
+        { row: 8,  nome: "Plano de celular",     orc: 64.17  },
+        { row: 9,  nome: "Youtube",              orc: 54.00  },
+        { row: 10, nome: "Google One",           orc: 12.50  },
+        { row: 11, nome: "F1",                   orc: 29.00  },
+        { row: 12, nome: "Claude",               orc: 115.00 },
+      ],
+      "Parcelas casa": [
+        { row: 13, nome: "Geladeira (3/12)",         orc: 176.61 },
+        { row: 14, nome: "Mesa (2/11)",               orc: 18.90  },
+        { row: 15, nome: "Máquina de lavar (2/12)",  orc: 116.00 },
+        { row: 16, nome: "Utensílios de casa (2/5)", orc: 109.33 },
+        { row: 17, nome: "Cama Mel (14/14)",         orc: 60.85  },
+      ],
+      "Alimentação": [
+        { row: 18, nome: "Mercado",                  orc: 800.00 },
+        { row: 19, nome: "Padaria",                  orc: 80.00  },
+        { row: 20, nome: "Delivery",                 orc: 100.00 },
+        { row: 21, nome: "Alimentação no trabalho",  orc: 250.00 },
+      ],
+      "Carro": [
+        { row: 22, nome: "Combustível",              orc: 800.00 },
+        { row: 23, nome: "Parcela manutenções carro",orc: 323.22 },
+        { row: 24, nome: "Seguro carro",             orc: 69.00  },
+        { row: 26, nome: "Estacionamento geral",     orc: 100.00 },
+        { row: 27, nome: "Estacionamento trabalho",  orc: 120.00 },
+      ],
+      "Pessoal": [
+        { row: 25, nome: "Metrô/uber",               orc: 120.00 },
+        { row: 32, nome: "Barbeiro",                 orc: 150.00 },
+        { row: 33, nome: "Looking Ahead (8/8)",      orc: 82.36  },
+      ],
+      "Melina": [
+        { row: 28, nome: "Plano de saúde Melina",    orc: 32.89  },
+        { row: 29, nome: "Escola",                   orc: 1319.00},
+        { row: 30, nome: "Roupas, passeio etc",      orc: 100.00 },
+      ],
+      "Baby": [
+        { row: 31, nome: "Vitaminas + enxoval",      orc: 200.00 },
+        { row: 41, nome: "Exame sexagem",             orc: 88.34  },
+      ],
+      "Financeiro": [
+        { row: 34, nome: "Contabilidade",            orc: 97.50  },
+        { row: 35, nome: "Imposto de renda",         orc: 212.00 },
+        { row: 36, nome: "Imposto nota",             orc: 618.00 },
+        { row: 37, nome: "Empréstimo 2/18",          orc: 580.00 },
+      ],
+      "Presentes": [
+        { row: 38, nome: "Aniversário vó",           orc: 120.00 },
+        { row: 39, nome: "Date agosto",              orc: null   },
+      ],
+      "Lazer": [
+        { row: 40, nome: "Presente Pedro 2/2",       orc: 89.50  },
+      ],
+    };
+
+    // ─── Dados: Contas (com vencimento manual) ─────────────────────────────
+    // dia = dia do mês de vencimento
+    const CONTAS = [
+      { row: 6,  nome: "Conta de gás",         orc: 50.00,    dia: 2  },
+      { row: 37, nome: "Empréstimo 2/18",       orc: 580.00,   dia: 5  },
+      { row: 2,  nome: "Aluguel",               orc: 1746.09,  dia: 7  },
+      { row: 3,  nome: "Condomínio",            orc: 650.00,   dia: 7  },
+      { row: 29, nome: "Escola",                orc: 1319.00,  dia: 7  },
+      { row: 7,  nome: "Conta de internet",     orc: 100.00,   dia: 20 },
+      { row: 34, nome: "Contabilidade",         orc: 97.50,    dia: 20 },
+      { row: 35, nome: "Imposto de renda",      orc: 212.00,   dia: 20 },
+      { row: 36, nome: "Imposto nota",          orc: 618.00,   dia: 20 },
+      { row: 4,  nome: "Conta de energia",      orc: 150.00,   dia: 30 },
+    ];
+
+    // Estado de pagamento (em memória)
+    const pagas = {};   // row → { valor, data }
+
+    // ─── Render: Contas ────────────────────────────────────────────────────
+    function renderContas() {
+      const hoje = new Date();
+      const diaHoje = hoje.getDate();
+      const lista = document.getElementById('contas-lista');
+
+      lista.innerHTML = '';
+
+      let totalPendente = 0;
+      let qtdPagas = 0;
+
+      CONTAS.forEach(conta => {
+        const isPago = !!pagas[conta.row];
+        if (!isPago) totalPendente += conta.orc;
+        else qtdPagas++;
+
+        // Badge de status
+        let badge = '';
+        if (isPago) {
+          badge = '<span class="badge badge-pago">✓ Pago</span>';
+        } else if (conta.dia < diaHoje) {
+          badge = '<span class="badge badge-vencido">Vencido</span>';
+        } else if (conta.dia === diaHoje) {
+          badge = '<span class="badge badge-hoje">Hoje</span>';
+        } else if (conta.dia - diaHoje <= 3) {
+          badge = '<span class="badge badge-vence">Em breve</span>';
+        }
+
+        const vencLabel = `dia ${String(conta.dia).padStart(2,'0')}/08`;
+        const orcFmt = conta.orc.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+        // Valor pago (se já pago)
+        const valorPago = isPago
+          ? pagas[conta.row].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+          : orcFmt;
+
+        const itemEl = document.createElement('div');
+        itemEl.className = 'conta-item' + (isPago ? ' pago' : '');
+        itemEl.id = `conta-${conta.row}`;
+
+        itemEl.innerHTML = `
+          <div class="conta-row">
+            <div class="conta-info">
+              <div class="conta-nome">${conta.nome}</div>
+              <div class="conta-meta">
+                <span class="conta-venc">${vencLabel}</span>
+                ${badge}
+              </div>
+            </div>
+            <div class="conta-orc">R$ ${isPago ? valorPago : orcFmt}</div>
+            ${isPago
+              ? '<div class="btn-pago-icon">✓</div>'
+              : `<button class="btn-pagar" onclick="abrirPagamento(${conta.row})">Pagar</button>`
+            }
+          </div>
+          ${!isPago ? `
+          <div class="pay-form" id="pay-form-${conta.row}">
+            <div class="pay-form-row">
+              <div class="pay-input-wrap">
+                <span>R$</span>
+                <input
+                  type="number"
+                  id="pay-input-${conta.row}"
+                  value="${conta.orc}"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                />
+              </div>
+              <button class="btn-confirmar" onclick="confirmarPagamento(${conta.row})">✓ Confirmar</button>
+              <button class="btn-cancelar" onclick="fecharPagamento(${conta.row})">✕</button>
+            </div>
+          </div>` : ''}
+        `;
+
+        lista.appendChild(itemEl);
+      });
+
+      // Totais
+      const totalFmt = totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+      document.getElementById('total-val').innerHTML = `<span>R$</span>${totalFmt}`;
+      document.getElementById('total-pagas').textContent = `${qtdPagas} / ${CONTAS.length}`;
+    }
+
+    function abrirPagamento(row) {
+      // Fecha outros abertos
+      document.querySelectorAll('.pay-form.open').forEach(f => f.classList.remove('open'));
+      const form = document.getElementById(`pay-form-${row}`);
+      if (form) {
+        form.classList.add('open');
+        const input = document.getElementById(`pay-input-${row}`);
+        if (input) { input.focus(); input.select(); }
+      }
+    }
+
+    function fecharPagamento(row) {
+      const form = document.getElementById(`pay-form-${row}`);
+      if (form) form.classList.remove('open');
+    }
+
+    function confirmarPagamento(row) {
+      const input = document.getElementById(`pay-input-${row}`);
+      const val = parseFloat(input.value);
+      if (!val || val <= 0) { showToast('Digite um valor válido', true); return; }
+
+      const hoje = new Date();
+      const dd = String(hoje.getDate()).padStart(2, '0');
+      const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+      const yyyy = hoje.getFullYear();
+      const dataHoje = `${dd}/${mm}/${yyyy}`;
+
+      enviarParaScript(row, val, dataHoje, () => {
+        pagas[row] = { valor: val, data: dataHoje };
+        renderContas();
+        showToast('✓ Conta marcada como paga!');
+      });
+    }
+
+    // ─── Envio ao Apps Script ──────────────────────────────────────────────
+    function enviarParaScript(row, value, date, onSuccess) {
+      const iframe = document.createElement('iframe');
+      iframe.name = 'submit-frame-' + row;
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'GET';
+      form.action = SCRIPT_URL;
+      form.target = iframe.name;
+
+      const params = [['row', parseInt(row)], ['value', value]];
+      if (date) params.push(['date', date]);
+
+      params.forEach(([name, val]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = val;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+
+      setTimeout(() => {
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+      }, 3000);
+
+      if (onSuccess) onSuccess();
+    }
+
+    // ─── Aba Orçamento ─────────────────────────────────────────────────────
+    function filtrarItens() {
+      const cat = document.getElementById('categoria').value;
+      const select = document.getElementById('item');
+      select.innerHTML = '<option value="" disabled selected>Selecione um item...</option>';
+      select.disabled = false;
+      document.getElementById('hint').innerHTML = '';
+      (ITENS[cat] || []).forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.row;
+        opt.textContent = item.nome;
+        opt.dataset.orc = item.orc || '';
+        select.appendChild(opt);
+      });
+    }
+
+    function mostrarOrcamento() {
+      const select = document.getElementById('item');
+      const opt = select.options[select.selectedIndex];
+      const orc = opt.dataset.orc;
+      const hint = document.getElementById('hint');
+      if (orc) {
+        hint.innerHTML = 'Orçamento previsto: <span>R$ ' + parseFloat(orc).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + '</span>';
+      } else {
+        hint.innerHTML = '';
+      }
+    }
+
+    function enviar() {
+      const cat = document.getElementById('categoria').value;
+      const select = document.getElementById('item');
+      const valor = document.getElementById('valor');
+      const btn = document.getElementById('btn');
+
+      const row = select.value;
+      const val = parseFloat(valor.value);
+
+      if (!cat) { showToast('Selecione uma categoria', true); return; }
+      if (!row)  { showToast('Selecione um item', true); return; }
+      if (!val || val <= 0) { showToast('Digite um valor válido', true); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      enviarParaScript(row, val, null, null);
+
+      showToast('✓ Salvo na planilha!');
+      valor.value = '';
+      select.selectedIndex = 0;
+      document.getElementById('categoria').selectedIndex = 0;
+      select.innerHTML = '<option value="" disabled selected>Selecione a categoria primeiro...</option>';
+      select.disabled = true;
+      document.getElementById('hint').innerHTML = '';
+
+      btn.disabled = false;
+      btn.textContent = 'Salvar na planilha';
+    }
+
+    // ─── Tabs ──────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['orcamento', 'contas'][i] === tab);
+      });
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    // ─── Toast ─────────────────────────────────────────────────────────────
+    function showToast(msg, error) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast' + (error ? ' error' : '') + ' show';
+      setTimeout(() => t.className = 'toast' + (error ? ' error' : ''), 2800);
+    }
+
+    // ─── Init ──────────────────────────────────────────────────────────────
+    renderContas();
+  </script>
+</body>
+</html>
