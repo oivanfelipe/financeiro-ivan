@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orçamento Ivan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; color: #fff; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 28px; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    select, input[type="number"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      color: #f0f0f0;
+      font-size: 15px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+
+    select:focus, input[type="number"]:focus { border-color: #3b82f6; }
+    select option { background: #1a1a1a; color: #f0f0f0; }
+    select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .field { margin-bottom: 20px; }
+
+    .valor-wrap { position: relative; }
+    .valor-wrap span {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%); color: #666; font-size: 15px; pointer-events: none;
+    }
+    .valor-wrap input { padding-left: 34px; }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    .orcamento-hint { font-size: 12px; color: #555; margin-top: 7px; }
+    .orcamento-hint span { color: #888; }
+
+    button {
+      width: 100%;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      margin-top: 4px;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .toast {
+      position: fixed;
+      bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #22c55e;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 40px;
+      font-size: 14px; font-weight: 500;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 100; white-space: nowrap;
+    }
+    .toast.error { background: #ef4444; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Orçamento Agosto</h1>
+    <p class="subtitle">Setembro (gastos de agosto)</p>
+
+    <div class="field">
+      <label>Categoria</label>
+      <select id="categoria" onchange="filtrarItens()">
+        <option value="" disabled selected>Selecione uma categoria...</option>
+        <option value="Casa">🏠 Casa</option>
+        <option value="Streaming e assinaturas">📺 Streaming e assinaturas</option>
+        <option value="Parcelas casa">🛋️ Parcelas casa</option>
+        <option value="Alimentação">🛒 Alimentação</option>
+        <option value="Carro">🚗 Carro</option>
+        <option value="Pessoal">🧍 Pessoal</option>
+        <option value="Melina">👧 Melina</option>
+        <option value="Baby">🍼 Baby</option>
+        <option value="Financeiro">💰 Financeiro</option>
+        <option value="Presentes">🎁 Presentes</option>
+        <option value="Lazer">🎉 Lazer</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Item</label>
+      <select id="item" disabled onchange="mostrarOrcamento()">
+        <option value="" disabled selected>Selecione a categoria primeiro...</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Valor gasto (R$)</label>
+      <div class="valor-wrap">
+        <span>R$</span>
+        <input type="number" id="valor" placeholder="0,00" step="0.01" min="0" />
+      </div>
+      <div class="orcamento-hint" id="hint"></div>
+    </div>
+
+    <button id="btn" onclick="enviar()">Salvar na planilha</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYQ23Y-nkkUHB_qN2hnrAD0UiFJQzQUwSop1h3vf5VmU07a4u7ps4DtxSm_orpe8rT/exec";
+
+    const ITENS = {
+      "Casa": [
+        { row: 2, nome: "Aluguel", orc: 1746.09 },
+        { row: 3, nome: "Condomínio", orc: 650.00 },
+        { row: 4, nome: "Conta de energia", orc: 150.00 },
+        { row: 5, nome: "Aluguel antigo", orc: 398.00 },
+        { row: 6, nome: "Conta de gás", orc: 50.00 },
+        { row: 7, nome: "Conta de internet", orc: 100.00 },
+      ],
+      "Streaming e assinaturas": [
+        { row: 8,  nome: "Plano de celular", orc: 64.17 },
+        { row: 9,  nome: "Youtube", orc: 54.00 },
+        { row: 10, nome: "Google One", orc: 12.50 },
+        { row: 11, nome: "F1", orc: 29.00 },
+        { row: 12, nome: "Claude", orc: 115.00 },
+      ],
+      "Parcelas casa": [
+        { row: 13, nome: "Geladeira (3/12)", orc: 176.61 },
+        { row: 14, nome: "Mesa (2/11)", orc: 18.90 },
+        { row: 15, nome: "Máquina de lavar (2/12)", orc: 116.00 },
+        { row: 16, nome: "Utensílios de casa (2/5)", orc: 109.33 },
+        { row: 17, nome: "Cama Mel (14/14)", orc: 60.85 },
+      ],
+      "Alimentação": [
+        { row: 18, nome: "Mercado", orc: 800.00 },
+        { row: 19, nome: "Padaria", orc: 80.00 },
+        { row: 20, nome: "Delivery", orc: 100.00 },
+        { row: 21, nome: "Alimentação no trabalho", orc: 250.00 },
+      ],
+      "Carro": [
+        { row: 22, nome: "Combustível", orc: 800.00 },
+        { row: 23, nome: "Parcela manutenções carro", orc: 323.22 },
+        { row: 24, nome: "Seguro carro", orc: 69.00 },
+        { row: 26, nome: "Estacionamento geral", orc: 100.00 },
+        { row: 27, nome: "Estacionamento trabalho", orc: 120.00 },
+      ],
+      "Pessoal": [
+        { row: 25, nome: "Metrô/uber", orc: 120.00 },
+        { row: 32, nome: "Barbeiro", orc: 150.00 },
+        { row: 33, nome: "Looking Ahead (8/8)", orc: 82.36 },
+      ],
+      "Melina": [
+        { row: 28, nome: "Plano de saúde Melina", orc: 32.89 },
+        { row: 29, nome: "Escola", orc: 1319.00 },
+        { row: 30, nome: "Roupas, passeio etc", orc: 100.00 },
+      ],
+      "Baby": [
+        { row: 31, nome: "Vitaminas + enxoval", orc: 200.00 },
+        { row: 41, nome: "Exame sexagem", orc: 88.34 },
+      ],
+      "Financeiro": [
+        { row: 34, nome: "Contabilidade", orc: 97.50 },
+        { row: 35, nome: "Imposto de renda", orc: 212.00 },
+        { row: 36, nome: "Imposto nota", orc: 618.00 },
+        { row: 37, nome: "Empréstimo 2/18", orc: 580.00 },
+      ],
+      "Presentes": [
+        { row: 38, nome: "Aniversário vó", orc: 120.00 },
+        { row: 39, nome: "Date agosto", orc: null },
+      ],
+      "Lazer": [
+        { row: 40, nome: "Presente Pedro 2/2", orc: 89.50 },
+      ],
+    };
+
+    function filtrarItens() {
+      const cat = document.getElementById('categoria').value;
+      const select = document.getElementById('item');
+      select.innerHTML = '<option value="" disabled selected>Selecione um item...</option>';
+      select.disabled = false;
+      document.getElementById('hint').innerHTML = '';
+
+      (ITENS[cat] || []).forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.row;
+        opt.textContent = item.nome;
+        opt.dataset.orc = item.orc || '';
+        select.appendChild(opt);
+      });
+    }
+
+    function mostrarOrcamento() {
+      const select = document.getElementById('item');
+      const opt = select.options[select.selectedIndex];
+      const orc = opt.dataset.orc;
+      const hint = document.getElementById('hint');
+      if (orc) {
+        hint.innerHTML = 'Orçamento previsto: <span>R$ ' + parseFloat(orc).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + '</span>';
+      } else {
+        hint.innerHTML = '';
+      }
+    }
+
+    function showToast(msg, error) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast' + (error ? ' error' : '') + ' show';
+      setTimeout(() => t.className = 'toast' + (error ? ' error' : ''), 2800);
+    }
+
+    async function enviar() {
+      const cat = document.getElementById('categoria').value;
+      const select = document.getElementById('item');
+      const valor = document.getElementById('valor');
+      const btn = document.getElementById('btn');
+
+      const row = select.value;
+      const val = parseFloat(valor.value);
+
+      if (!cat) { showToast('Selecione uma categoria', true); return; }
+      if (!row) { showToast('Selecione um item', true); return; }
+      if (!val || val <= 0) { showToast('Digite um valor válido', true); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      // Usa iframe oculto para evitar bloqueio CORS do Apps Script
+      const iframe = document.createElement('iframe');
+      iframe.name = 'submit-frame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'GET';
+      form.action = SCRIPT_URL;
+      form.target = 'submit-frame';
+
+      [['row', parseInt(row)], ['value', val]].forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+
+      setTimeout(() => {
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+      }, 3000);
+
+      showToast('✓ Salvo na planilha!');
+      valor.value = '';
+      select.selectedIndex = 0;
+      document.getElementById('categoria').selectedIndex = 0;
+      select.innerHTML = '<option value="" disabled selected>Selecione a categoria primeiro...</option>';
+      select.disabled = true;
+      document.getElementById('hint').innerHTML = '';
+
+      btn.disabled = false;
+      btn.textContent = 'Salvar na planilha';
+    }
+  </script>
+</body>
+</html>
