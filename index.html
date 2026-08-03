@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orçamento Ivan</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px 48px;
+    }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 28px 24px 32px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: #111;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 9px 6px;
+      border: none;
+      background: transparent;
+      color: #555;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn.active { background: #2a2a2a; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Títulos ── */
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; color: #fff; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    /* ── Botão refresh ── */
+    .btn-refresh {
+      background: transparent;
+      border: 1px solid #2a2a2a;
+      color: #555;
+      border-radius: 8px;
+      padding: 6px 11px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 2px;
+    }
+    .btn-refresh:hover { border-color: #444; color: #aaa; }
+    .btn-refresh:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Spinner ── */
+    .contas-loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #444;
+      font-size: 13px;
+      padding: 24px 0;
+      justify-content: center;
+    }
+    .spinner-sm {
+      width: 16px; height: 16px;
+      border: 2px solid #2a2a2a;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Form (Orçamento) ── */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+    select, input[type="number"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      color: #f0f0f0;
+      font-size: 15px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+    select:focus, input[type="number"]:focus { border-color: #3b82f6; }
+    select option { background: #1a1a1a; color: #f0f0f0; }
+    select:disabled { opacity: 0.4; cursor: not-allowed; }
+    .field { margin-bottom: 20px; }
+    .valor-wrap { position: relative; }
+    .valor-wrap span {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%); color: #666; font-size: 15px; pointer-events: none;
+    }
+    .valor-wrap input { padding-left: 34px; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .orcamento-hint { font-size: 12px; color: #555; margin-top: 7px; }
+    .orcamento-hint span { color: #888; }
+    button.btn-primary {
+      width: 100%;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      margin-top: 4px;
+    }
+    button.btn-primary:hover { background: #2563eb; }
+    button.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Contas ── */
+    .contas-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .contas-total-label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; }
+    .contas-total-val { font-size: 22px; font-weight: 700; color: #fff; }
+    .contas-total-val span { font-size: 13px; font-weight: 400; color: #555; margin-right: 4px; }
+    .divider { border: none; border-top: 1px solid #222; margin: 4px 0 16px; }
+
+    .conta-item {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .conta-item.pago { opacity: 0.45; border-color: #1a3a1a; }
+    .conta-row { display: flex; align-items: center; gap: 12px; }
+    .conta-info { flex: 1; min-width: 0; }
+    .conta-nome {
+      font-size: 15px; font-weight: 500; color: #f0f0f0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .conta-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+    .conta-venc { font-size: 12px; color: #555; }
+    .badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; letter-spacing: 0.04em; }
+    .badge-hoje    { background: #451a03; color: #fb923c; }
+    .badge-vence   { background: #1e1b4b; color: #818cf8; }
+    .badge-pago    { background: #14532d; color: #4ade80; }
+    .badge-vencido { background: #450a0a; color: #f87171; }
+    .conta-orc { font-size: 15px; font-weight: 600; color: #fff; white-space: nowrap; }
+    .btn-pagar {
+      background: #3b82f6; color: #fff; border: none;
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      padding: 7px 14px; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s; flex-shrink: 0;
+    }
+    .btn-pagar:hover { background: #2563eb; }
+    .btn-pago-icon { color: #4ade80; font-size: 20px; flex-shrink: 0; width: 36px; text-align: center; }
+
+    .pay-form { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2a2a; }
+    .pay-form.open { display: block; }
+    .pay-form-row { display: flex; gap: 8px; align-items: center; }
+    .pay-input-wrap { position: relative; flex: 1; }
+    .pay-input-wrap span {
+      position: absolute; left: 12px; top: 50%;
+      transform: translateY(-50%); color: #666; font-size: 14px; pointer-events: none;
+    }
+    .pay-input-wrap input { padding: 10px 10px 10px 32px; font-size: 14px; border-radius: 8px; }
+    .pay-input-wrap input:focus { border-color: #3b82f6; }
+    .btn-confirmar {
+      background: #22c55e; color: #fff; border: none;
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      padding: 10px 16px; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn-confirmar:hover { background: #16a34a; }
+    .btn-cancelar {
+      background: #2a2a2a; color: #888; border: none;
+      border-radius: 8px; font-size: 13px; font-weight: 500;
+      padding: 10px 14px; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-cancelar:hover { background: #333; color: #ccc; }
+
+    /* ── Dashboard: cards de resumo ── */
+    .dash-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .dash-card {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .dash-card-wide {
+      grid-column: 1 / -1;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .dash-card-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .dash-card-val { font-size: 22px; font-weight: 700; color: #fff; line-height: 1.1; }
+    .dash-card-val .pfx { font-size: 13px; font-weight: 400; color: #555; margin-right: 2px; }
+
+    .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .progress-label  { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; }
+    .progress-pct    { font-size: 20px; font-weight: 700; }
+    .progress-bar-bg { height: 8px; background: #2a2a2a; border-radius: 99px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+    .progress-detail { display: flex; justify-content: space-between; font-size: 12px; color: #444; margin-top: 8px; }
+
+    /* ── Dashboard: seções ── */
+    .d-section { margin-bottom: 20px; }
+    .d-section-title {
+      font-size: 11px; font-weight: 600; color: #555;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+    }
+
+    .alert-item {
+      background: #1a0f0f; border: 1px solid #3a1818;
+      border-radius: 12px; padding: 13px 15px; margin-bottom: 8px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .alert-nome { font-size: 14px; font-weight: 500; color: #f0f0f0; }
+    .alert-cat  { font-size: 11px; color: #555; margin-top: 2px; }
+    .alert-nums { text-align: right; flex-shrink: 0; }
+    .alert-val  { font-size: 14px; font-weight: 600; color: #f87171; }
+    .alert-orc  { font-size: 11px; color: #555; margin-top: 2px; }
+    .alert-diff {
+      font-size: 11px; font-weight: 600; color: #f87171;
+      background: #2a0a0a; border-radius: 20px;
+      padding: 2px 8px; margin-top: 4px; display: inline-block;
+    }
+    .warn-item {
+      background: #141008; border: 1px solid #3a2a08;
+      border-radius: 12px; padding: 13px 15px; margin-bottom: 8px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .warn-val  { font-size: 14px; font-weight: 600; color: #fbbf24; }
+    .warn-diff {
+      font-size: 11px; font-weight: 600; color: #fbbf24;
+      background: #201508; border-radius: 20px;
+      padding: 2px 8px; margin-top: 4px; display: inline-block;
+    }
+    .no-alerts {
+      background: #0f1a0f; border: 1px solid #1a3a1a;
+      border-radius: 12px; padding: 14px 16px;
+      font-size: 13px; color: #4ade80; text-align: center;
+    }
+    .empty-d { font-size: 13px; color: #444; text-align: center; padding: 12px 0; }
+
+    /* ── Dashboard: gráfico ── */
+    .chart-wrap {
+      background: #111; border: 1px solid #2a2a2a;
+      border-radius: 14px; padding: 20px;
+    }
+    .chart-canvas-wrap { position: relative; max-width: 220px; margin: 0 auto 20px; }
+    .chart-center {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%); text-align: center; pointer-events: none;
+    }
+    .chart-center-val   { font-size: 16px; font-weight: 700; color: #fff; }
+    .chart-center-label { font-size: 11px; color: #555; margin-top: 2px; }
+    .chart-legend { display: flex; flex-direction: column; gap: 8px; }
+    .legend-item  { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .legend-left  { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .legend-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-nome  { font-size: 13px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .legend-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .legend-val   { font-size: 13px; font-weight: 600; color: #fff; }
+    .legend-pct   { font-size: 11px; color: #444; }
+
+    /* ── Dashboard: breakdown categorias ── */
+    .cat-item {
+      background: #111; border: 1px solid #2a2a2a;
+      border-radius: 12px; padding: 13px 15px; margin-bottom: 8px;
+    }
+    .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .cat-nome   { font-size: 14px; font-weight: 500; color: #f0f0f0; }
+    .cat-vals   { font-size: 12px; color: #555; text-align: right; }
+    .cat-vals strong { color: #ccc; }
+    .cat-bar-bg   { height: 5px; background: #222; border-radius: 99px; overflow: hidden; }
+    .cat-bar-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; }
+    .cat-sub { display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px; }
+    .cat-restante.positivo { color: #555; }
+    .cat-restante.negativo { color: #f87171; }
+    .cat-pct.warn   { color: #fbbf24; }
+    .cat-pct.danger { color: #f87171; }
+    .cat-pct        { color: #444; }
+
+    /* ── Estado de erro (dashboard) ── */
+    .state-box {
+      background: #111; border: 1px solid #2a2a2a;
+      border-radius: 14px; padding: 40px 20px;
+      text-align: center; color: #444; font-size: 14px;
+    }
+    .state-box.error { border-color: #3a1818; color: #f87171; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #22c55e; color: #fff;
+      padding: 12px 24px; border-radius: 40px;
+      font-size: 14px; font-weight: 500;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 100; white-space: nowrap;
+    }
+    .toast.error { background: #ef4444; }
+    .toast.show  { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('orcamento')">Orçamento</button>
+    <button class="tab-btn"        onclick="switchTab('contas')">Contas</button>
+    <button class="tab-btn"        onclick="switchTab('dashboard')">Dashboard</button>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       ABA: ORÇAMENTO
+  ═══════════════════════════════════ -->
+  <div id="tab-orcamento" class="tab-content active">
+    <h1>Orçamento Agosto</h1>
+    <p class="subtitle">Setembro (gastos de agosto)</p>
+
+    <div class="field">
+      <label>Categoria</label>
+      <select id="categoria" onchange="filtrarItens()">
+        <option value="" disabled selected>Selecione uma categoria...</option>
+        <option value="Casa">🏠 Casa</option>
+        <option value="Streaming e assinaturas">📺 Streaming e assinaturas</option>
+        <option value="Parcelas casa">🛋️ Parcelas casa</option>
+        <option value="Alimentação">🛒 Alimentação</option>
+        <option value="Carro">🚗 Carro</option>
+        <option value="Pessoal">🧍 Pessoal</option>
+        <option value="Melina">👧 Melina</option>
+        <option value="Baby">🍼 Baby</option>
+        <option value="Financeiro">💰 Financeiro</option>
+        <option value="Presentes">🎁 Presentes</option>
+        <option value="Lazer">🎉 Lazer</option>
+        <option disabled>──────────</option>
+        <option value="__outros__">✏️ Outros (item livre)</option>
+      </select>
+    </div>
+
+    <div class="field" id="field-item">
+      <label>Item</label>
+      <select id="item" disabled onchange="mostrarOrcamento()">
+        <option value="" disabled selected>Selecione a categoria primeiro...</option>
+      </select>
+    </div>
+
+    <div class="field" id="field-outros" style="display:none">
+      <label>Descrição</label>
+      <input type="text" id="outros-desc" placeholder="Ex: Consulta médica, Material escola..." style="
+        width:100%;background:#111;border:1px solid #2a2a2a;border-radius:10px;
+        color:#f0f0f0;font-size:15px;padding:12px 14px;outline:none;
+        transition:border-color 0.15s;font-family:inherit;
+      " onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#2a2a2a'" />
+      <div style="margin-top:12px">
+        <label>Categoria para a planilha</label>
+        <select id="outros-cat" style="
+          width:100%;background:#111;border:1px solid #2a2a2a;border-radius:10px;
+          color:#f0f0f0;font-size:15px;padding:12px 14px;outline:none;
+          appearance:none;-webkit-appearance:none;
+          background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E\");
+          background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;
+        ">
+          <option value="Outros">Outros</option>
+          <option value="Casa">🏠 Casa</option>
+          <option value="Alimentação">🛒 Alimentação</option>
+          <option value="Carro">🚗 Carro</option>
+          <option value="Pessoal">🧍 Pessoal</option>
+          <option value="Melina">👧 Melina</option>
+          <option value="Baby">🍼 Baby</option>
+          <option value="Financeiro">💰 Financeiro</option>
+          <option value="Lazer">🎉 Lazer</option>
+          <option value="Presentes">🎁 Presentes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Valor gasto (R$)</label>
+      <div class="valor-wrap">
+        <span>R$</span>
+        <input type="number" id="valor" placeholder="0,00" step="0.01" min="0" />
+      </div>
+      <div class="orcamento-hint" id="hint"></div>
+    </div>
+
+    <button class="btn-primary" id="btn-salvar" onclick="enviar()">Salvar na planilha</button>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       ABA: CONTAS
+  ═══════════════════════════════════ -->
+  <div id="tab-contas" class="tab-content">
+    <div class="section-header">
+      <h1>Contas</h1>
+      <button class="btn-refresh" id="btn-refresh-contas" onclick="carregarContas()">↻ Atualizar</button>
+    </div>
+    <p class="subtitle">Agosto 2026 — vencimentos do mês</p>
+
+    <div class="contas-total">
+      <div>
+        <div class="contas-total-label">Total a pagar</div>
+        <div class="contas-total-val" id="total-val"><span>R$</span>—</div>
+      </div>
+      <div style="text-align:right">
+        <div class="contas-total-label">Pagas</div>
+        <div style="font-size:15px;font-weight:600;color:#4ade80" id="total-pagas">— / —</div>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #222;margin:0 0 16px" />
+    <div id="contas-lista">
+      <div class="contas-loading"><div class="spinner-sm"></div> Carregando...</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       ABA: DASHBOARD
+  ═══════════════════════════════════ -->
+  <div id="tab-dashboard" class="tab-content">
+    <div class="section-header">
+      <div>
+        <h1>Dashboard</h1>
+        <p class="subtitle">Agosto 2026 — resumo de gastos</p>
+      </div>
+      <button class="btn-refresh" id="btn-refresh-dash" onclick="carregarDashboard(true)">↻</button>
+    </div>
+
+    <div id="dash-root">
+      <div class="contas-loading"><div class="spinner-sm"></div> Carregando...</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNoLwAy-3mGT_4lKto5yH9W1ExB1-_XepAibtonu9iVM7-KWQyvcVVJ4EzHia6ff9p/exec";
+
+  // ── Dados: Orçamento ────────────────────────────────────────────────────────
+  const ITENS = {
+    "Casa": [
+      { row: 2,  nome: "Aluguel",               orc: 1746.09 },
+      { row: 3,  nome: "Condomínio",             orc: 650.00  },
+      { row: 4,  nome: "Conta de energia",       orc: 150.00  },
+      { row: 5,  nome: "Aluguel antigo",         orc: 398.00  },
+      { row: 6,  nome: "Conta de gás",           orc: 50.00   },
+      { row: 7,  nome: "Conta de internet",      orc: 100.00  },
+    ],
+    "Streaming e assinaturas": [
+      { row: 8,  nome: "Plano de celular",       orc: 64.17   },
+      { row: 9,  nome: "Youtube",                orc: 54.00   },
+      { row: 10, nome: "Google One",             orc: 12.50   },
+      { row: 11, nome: "F1",                     orc: 29.00   },
+      { row: 12, nome: "Claude",                 orc: 115.00  },
+    ],
+    "Parcelas casa": [
+      { row: 13, nome: "Geladeira (3/12)",           orc: 176.61 },
+      { row: 14, nome: "Mesa (2/11)",                 orc: 18.90  },
+      { row: 15, nome: "Máquina de lavar (2/12)",    orc: 116.00 },
+      { row: 16, nome: "Utensílios de casa (2/5)",   orc: 109.33 },
+      { row: 17, nome: "Cama Mel (14/14)",           orc: 60.85  },
+    ],
+    "Alimentação": [
+      { row: 18, nome: "Mercado",                orc: 800.00  },
+      { row: 19, nome: "Padaria",                orc: 80.00   },
+      { row: 20, nome: "Delivery",               orc: 100.00  },
+      { row: 21, nome: "Alimentação no trabalho",orc: 250.00  },
+    ],
+    "Carro": [
+      { row: 22, nome: "Combustível",            orc: 800.00  },
+      { row: 23, nome: "Parcela manutenções carro", orc: 323.22 },
+      { row: 24, nome: "Seguro carro",           orc: 69.00   },
+      { row: 26, nome: "Estacionamento geral",   orc: 100.00  },
+      { row: 27, nome: "Estacionamento trabalho",orc: 120.00  },
+    ],
+    "Pessoal": [
+      { row: 25, nome: "Metrô/uber",             orc: 120.00  },
+      { row: 32, nome: "Barbeiro",               orc: 150.00  },
+      { row: 33, nome: "Looking Ahead (8/8)",    orc: 82.36   },
+    ],
+    "Melina": [
+      { row: 28, nome: "Plano de saúde Melina",  orc: 32.89   },
+      { row: 29, nome: "Escola",                 orc: 1319.00 },
+      { row: 30, nome: "Roupas, passeio etc",    orc: 100.00  },
+    ],
+    "Baby": [
+      { row: 31, nome: "Vitaminas + enxoval",    orc: 200.00  },
+      { row: 41, nome: "Exame sexagem",          orc: 88.34   },
+    ],
+    "Financeiro": [
+      { row: 34, nome: "Contabilidade",          orc: 97.50   },
+      { row: 35, nome: "Imposto de renda",       orc: 212.00  },
+      { row: 36, nome: "Imposto nota",           orc: 618.00  },
+      { row: 37, nome: "Empréstimo 2/18",        orc: 580.00  },
+    ],
+    "Presentes": [
+      { row: 38, nome: "Aniversário vó",         orc: 120.00  },
+      { row: 39, nome: "Date agosto",            orc: null    },
+    ],
+    "Lazer": [
+      { row: 40, nome: "Presente Pedro 2/2",     orc: 89.50   },
+    ],
+  };
+
+  // ── Dados: Contas com vencimento ────────────────────────────────────────────
+  const CONTAS = [
+    { row: 6,  nome: "Conta de gás",       orc: 50.00,   dia: 2  },
+    { row: 37, nome: "Empréstimo 2/18",    orc: 580.00,  dia: 5  },
+    { row: 2,  nome: "Aluguel",            orc: 1746.09, dia: 7  },
+    { row: 3,  nome: "Condomínio",         orc: 650.00,  dia: 7  },
+    { row: 29, nome: "Escola",             orc: 1319.00, dia: 7  },
+    { row: 7,  nome: "Conta de internet",  orc: 100.00,  dia: 20 },
+    { row: 34, nome: "Contabilidade",      orc: 97.50,   dia: 20 },
+    { row: 35, nome: "Imposto de renda",   orc: 212.00,  dia: 20 },
+    { row: 36, nome: "Imposto nota",       orc: 618.00,  dia: 20 },
+    { row: 4,  nome: "Conta de energia",   orc: 150.00,  dia: 30 },
+  ];
+
+  const CORES = {
+    "Casa":                    "#3b82f6",
+    "Streaming e assinaturas": "#8b5cf6",
+    "Parcelas casa":           "#06b6d4",
+    "Alimentação":             "#f59e0b",
+    "Carro":                   "#ef4444",
+    "Pessoal":                 "#10b981",
+    "Melina":                  "#f97316",
+    "Baby":                    "#ec4899",
+    "Financeiro":              "#64748b",
+    "Presentes":               "#a78bfa",
+    "Lazer":                   "#84cc16",
+  };
+
+  // ── Estado ──────────────────────────────────────────────────────────────────
+  const pagas   = {};    // row → { valor }
+  let dashData  = null;  // cache dos dados do dashboard
+  let chartInst = null;  // instância do Chart.js
+
+  // ── Utilitários ─────────────────────────────────────────────────────────────
+  function fmt(v) {
+    return (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function showToast(msg, error) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (error ? ' error' : '') + ' show';
+    setTimeout(() => t.className = 'toast' + (error ? ' error' : ''), 2800);
+  }
+
+  // JSONP — funciona sem servidor (file://) e sem CORS
+  function fetchJsonp(url) {
+    return new Promise((resolve, reject) => {
+      const cb  = '__cb_' + Date.now();
+      const s   = document.createElement('script');
+      s.src     = url + '&callback=' + cb;
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('Timeout — verifique se o Apps Script foi republicado.'));
+      }, 10000);
+      window[cb] = (data) => { cleanup(); resolve(data); };
+      s.onerror  = ()     => { cleanup(); reject(new Error('Falha ao carregar. Verifique a URL do script.')); };
+      function cleanup() { clearTimeout(timer); delete window[cb]; if (s.parentNode) s.parentNode.removeChild(s); }
+      document.head.appendChild(s);
+    });
+  }
+
+  // Envio via iframe (write — sem CORS)
+  // overwrite=true → substitui o valor (usado nas Contas)
+  // overwrite=false (padrão) → soma ao valor existente (usado no Orçamento)
+  function enviarParaScript(row, value, date, onSuccess, overwrite = false) {
+    const iframe = document.createElement('iframe');
+    iframe.name  = 'frame_' + row + '_' + Date.now();
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form   = document.createElement('form');
+    form.method  = 'GET';
+    form.action  = SCRIPT_URL;
+    form.target  = iframe.name;
+
+    const params = [['row', parseInt(row)], ['value', value]];
+    if (date)      params.push(['date', date]);
+    if (overwrite) params.push(['overwrite', 'true']);
+
+    params.forEach(([name, val]) => {
+      const inp = document.createElement('input');
+      inp.type  = 'hidden';
+      inp.name  = name;
+      inp.value = val;
+      form.appendChild(inp);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(() => {
+      if (form.parentNode)   form.parentNode.removeChild(form);
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 3000);
+
+    if (onSuccess) onSuccess();
+  }
+
+  // ── Tab switching ────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', ['orcamento', 'contas', 'dashboard'][i] === tab);
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'contas')    carregarContas();
+    if (tab === 'dashboard') carregarDashboard(false);
+  }
+
+  // ── ABA: ORÇAMENTO ───────────────────────────────────────────────────────────
+  function filtrarItens() {
+    const cat      = document.getElementById('categoria').value;
+    const select   = document.getElementById('item');
+    const isOutros = cat === '__outros__';
+
+    document.getElementById('field-item').style.display   = isOutros ? 'none' : '';
+    document.getElementById('field-outros').style.display = isOutros ? ''     : 'none';
+    document.getElementById('hint').innerHTML = '';
+
+    if (!isOutros) {
+      select.innerHTML = '<option value="" disabled selected>Selecione um item...</option>';
+      select.disabled  = false;
+      (ITENS[cat] || []).forEach(item => {
+        const opt       = document.createElement('option');
+        opt.value       = item.row;
+        opt.textContent = item.nome;
+        opt.dataset.orc = item.orc || '';
+        select.appendChild(opt);
+      });
+    }
+  }
+
+  function mostrarOrcamento() {
+    const select = document.getElementById('item');
+    const opt    = select.options[select.selectedIndex];
+    const orc    = opt.dataset.orc;
+    const hint   = document.getElementById('hint');
+    hint.innerHTML = orc
+      ? 'Orçamento previsto: <span>R$ ' + parseFloat(orc).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + '</span>'
+      : '';
+  }
+
+  function hoje() {
+    const d  = new Date();
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  }
+
+  function enviar() {
+    const cat    = document.getElementById('categoria').value;
+    const valor  = document.getElementById('valor');
+    const btn    = document.getElementById('btn-salvar');
+    const val    = parseFloat(valor.value);
+    const data   = hoje();
+
+    if (!cat)           { showToast('Selecione uma categoria', true); return; }
+    if (!val || val<=0) { showToast('Digite um valor válido', true);  return; }
+
+    // ── Modo "Outros": adiciona nova linha na planilha ──
+    if (cat === '__outros__') {
+      const desc    = document.getElementById('outros-desc').value.trim();
+      const catPlan = document.getElementById('outros-cat').value;
+      if (!desc) { showToast('Digite uma descrição', true); return; }
+
+      btn.disabled    = true;
+      btn.textContent = 'Salvando...';
+      appendParaScript(desc, catPlan, val, data, () => {
+        showToast('✓ Lançado como nova linha!');
+        valor.value = '';
+        document.getElementById('outros-desc').value = '';
+        document.getElementById('categoria').selectedIndex = 0;
+        document.getElementById('field-item').style.display   = '';
+        document.getElementById('field-outros').style.display = 'none';
+        document.getElementById('item').innerHTML = '<option value="" disabled selected>Selecione a categoria primeiro...</option>';
+        document.getElementById('item').disabled  = true;
+        btn.disabled    = false;
+        btn.textContent = 'Salvar na planilha';
+        dashData = null;
+      });
+      return;
+    }
+
+    // ── Modo normal: atualiza linha existente (soma) ──
+    const select = document.getElementById('item');
+    const row    = select.value;
+    if (!row) { showToast('Selecione um item', true); return; }
+
+    btn.disabled    = true;
+    btn.textContent = 'Salvando...';
+
+    enviarParaScript(row, val, data, () => {  // data → grava data do último lançamento (col F)
+      showToast('✓ Salvo na planilha!');
+      valor.value = '';
+      select.selectedIndex = 0;
+      document.getElementById('categoria').selectedIndex = 0;
+      select.innerHTML = '<option value="" disabled selected>Selecione a categoria primeiro...</option>';
+      select.disabled  = true;
+      document.getElementById('hint').innerHTML = '';
+      btn.disabled    = false;
+      btn.textContent = 'Salvar na planilha';
+      dashData = null;
+    });
+  }
+
+  // Adiciona nova linha na planilha (usado para "Outros")
+  function appendParaScript(nome, categoria, value, date, onSuccess) {
+    const iframe = document.createElement('iframe');
+    iframe.name  = 'frame_append_' + Date.now();
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form  = document.createElement('form');
+    form.method = 'GET';
+    form.action = SCRIPT_URL;
+    form.target = iframe.name;
+
+    [['action', 'append'], ['nome', nome], ['categoria', categoria], ['value', value], ['date', date]]
+      .forEach(([n, v]) => {
+        const inp = document.createElement('input');
+        inp.type  = 'hidden';
+        inp.name  = n;
+        inp.value = v;
+        form.appendChild(inp);
+      });
+
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(() => {
+      if (form.parentNode)   form.parentNode.removeChild(form);
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 3000);
+
+    if (onSuccess) onSuccess();
+  }
+
+  // ── ABA: CONTAS ──────────────────────────────────────────────────────────────
+  async function carregarContas() {
+    const lista = document.getElementById('contas-lista');
+    const btn   = document.getElementById('btn-refresh-contas');
+    lista.innerHTML = '<div class="contas-loading"><div class="spinner-sm"></div> Carregando...</div>';
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+    try {
+      const json = await fetchJsonp(`${SCRIPT_URL}?action=read`);
+      if (json.ok && json.data) {
+        const rows = new Set(CONTAS.map(c => c.row));
+        json.data.forEach(r => {
+          if (rows.has(r.row) && r.custo != null) {
+            pagas[r.row] = { valor: r.custo };
+          }
+        });
+      }
+    } catch (e) { /* usa estado local */ }
+
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Atualizar'; }
+    renderContas();
+  }
+
+  function renderContas() {
+    const hoje    = new Date();
+    const diaHoje = hoje.getDate();
+    const lista   = document.getElementById('contas-lista');
+    lista.innerHTML = '';
+
+    let totalPendente = 0;
+    let qtdPagas = 0;
+
+    CONTAS.forEach(conta => {
+      const isPago = !!pagas[conta.row];
+      if (!isPago) totalPendente += conta.orc;
+      else         qtdPagas++;
+
+      let badge = '';
+      if (isPago)                           badge = '<span class="badge badge-pago">✓ Pago</span>';
+      else if (conta.dia < diaHoje)         badge = '<span class="badge badge-vencido">Vencido</span>';
+      else if (conta.dia === diaHoje)       badge = '<span class="badge badge-hoje">Hoje</span>';
+      else if (conta.dia - diaHoje <= 3)    badge = '<span class="badge badge-vence">Em breve</span>';
+
+      const vencLabel = `dia ${String(conta.dia).padStart(2,'0')}/08`;
+      const orcFmt    = conta.orc.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+      const valorPago = isPago ? pagas[conta.row].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : orcFmt;
+
+      const el = document.createElement('div');
+      el.className = 'conta-item' + (isPago ? ' pago' : '');
+      el.id = `conta-${conta.row}`;
+      el.innerHTML = `
+        <div class="conta-row">
+          <div class="conta-info">
+            <div class="conta-nome">${conta.nome}</div>
+            <div class="conta-meta">
+              <span class="conta-venc">${vencLabel}</span>${badge}
+            </div>
+          </div>
+          <div class="conta-orc">R$ ${isPago ? valorPago : orcFmt}</div>
+          ${isPago
+            ? '<div class="btn-pago-icon">✓</div>'
+            : `<button class="btn-pagar" onclick="abrirPagamento(${conta.row})">Pagar</button>`}
+        </div>
+        ${!isPago ? `
+        <div class="pay-form" id="pay-form-${conta.row}">
+          <div class="pay-form-row">
+            <div class="pay-input-wrap">
+              <span>R$</span>
+              <input type="number" id="pay-input-${conta.row}" value="${conta.orc}" step="0.01" min="0" />
+            </div>
+            <button class="btn-confirmar" onclick="confirmarPagamento(${conta.row})">✓ Confirmar</button>
+            <button class="btn-cancelar"  onclick="fecharPagamento(${conta.row})">✕</button>
+          </div>
+        </div>` : ''}
+      `;
+      lista.appendChild(el);
+    });
+
+    const totalFmt = totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    document.getElementById('total-val').innerHTML   = `<span>R$</span>${totalFmt}`;
+    document.getElementById('total-pagas').textContent = `${qtdPagas} / ${CONTAS.length}`;
+  }
+
+  function abrirPagamento(row) {
+    document.querySelectorAll('.pay-form.open').forEach(f => f.classList.remove('open'));
+    const form  = document.getElementById(`pay-form-${row}`);
+    const input = document.getElementById(`pay-input-${row}`);
+    if (form)  form.classList.add('open');
+    if (input) { input.focus(); input.select(); }
+  }
+
+  function fecharPagamento(row) {
+    const form = document.getElementById(`pay-form-${row}`);
+    if (form) form.classList.remove('open');
+  }
+
+  function confirmarPagamento(row) {
+    const input = document.getElementById(`pay-input-${row}`);
+    const val   = parseFloat(input.value);
+    if (!val || val <= 0) { showToast('Digite um valor válido', true); return; }
+
+    const hoje  = new Date();
+    const dd    = String(hoje.getDate()).padStart(2,'0');
+    const mm    = String(hoje.getMonth()+1).padStart(2,'0');
+    const data  = `${dd}/${mm}/${hoje.getFullYear()}`;
+
+    // overwrite=true: substitui o valor pago (não soma com anterior)
+    enviarParaScript(row, val, data, () => {
+      pagas[row] = { valor: val };
+      dashData   = null; // invalida cache
+      renderContas();
+      showToast('✓ Conta marcada como paga!');
+    }, true);
+  }
+
+  // ── ABA: DASHBOARD ───────────────────────────────────────────────────────────
+  async function carregarDashboard(force) {
+    if (dashData && !force) { renderDashboard(dashData); return; }
+
+    const root = document.getElementById('dash-root');
+    const btn  = document.getElementById('btn-refresh-dash');
+    root.innerHTML = '<div class="contas-loading"><div class="spinner-sm"></div> Carregando...</div>';
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+    try {
+      const json = await fetchJsonp(`${SCRIPT_URL}?action=read`);
+      if (!json.ok) throw new Error(json.error || 'Erro desconhecido');
+      dashData = json.data;
+      renderDashboard(dashData);
+    } catch (err) {
+      root.innerHTML = `
+        <div class="state-box error">
+          ⚠️ Não foi possível carregar os dados.<br>
+          <span style="font-size:12px;color:#555;margin-top:8px;display:block">${err.message}</span>
+        </div>`;
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '↻'; }
+  }
+
+  function renderDashboard(rows) {
+    // Destrói chart ANTES de substituir o DOM
+    if (chartInst) { chartInst.destroy(); chartInst = null; }
+
+    // Agrupa por categoria
+    const cats = {};
+    let totalOrc = 0, totalGasto = 0;
+    rows.forEach(r => {
+      const cat = r.categoria;
+      if (!cats[cat]) cats[cat] = { orc: 0, gasto: 0 };
+      if (r.orcamento) { cats[cat].orc   += r.orcamento; totalOrc   += r.orcamento; }
+      if (r.custo)     { cats[cat].gasto += r.custo;     totalGasto += r.custo;     }
+    });
+
+    const pct    = totalOrc > 0 ? (totalGasto / totalOrc) * 100 : 0;
+    const saldo  = totalOrc - totalGasto;
+    const corBar = pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#22c55e';
+
+    const alertas = rows.filter(r => r.custo && r.orcamento && r.custo > r.orcamento);
+    const atencao = rows.filter(r => r.custo && r.orcamento && r.custo < r.orcamento && (r.custo / r.orcamento) >= 0.8);
+
+    const root = document.getElementById('dash-root');
+    root.innerHTML = `
+      <!-- Cards -->
+      <div class="dash-cards">
+        <div class="dash-card">
+          <div class="dash-card-label">Total orçado</div>
+          <div class="dash-card-val"><span class="pfx">R$</span>${fmt(totalOrc)}</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-label">Total gasto</div>
+          <div class="dash-card-val"><span class="pfx">R$</span>${fmt(totalGasto)}</div>
+        </div>
+        <div class="dash-card-wide">
+          <div class="progress-header">
+            <span class="progress-label">Execução do orçamento</span>
+            <span class="progress-pct" style="color:${corBar}">${pct.toFixed(1)}%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="width:${Math.min(pct,100)}%;background:${corBar}"></div>
+          </div>
+          <div class="progress-detail">
+            <span>Gasto: <strong style="color:#ccc">R$ ${fmt(totalGasto)}</strong></span>
+            <span>${saldo >= 0
+              ? 'Saldo: <strong style="color:#4ade80">R$ ' + fmt(saldo) + '</strong>'
+              : 'Estouro: <strong style="color:#f87171">R$ ' + fmt(Math.abs(saldo)) + '</strong>'}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alertas: acima do orçamento -->
+      <div class="d-section">
+        <div class="d-section-title">🔴 Acima do orçamento (${alertas.length})</div>
+        ${alertas.length === 0
+          ? '<div class="no-alerts">✓ Nenhum item acima do orçamento</div>'
+          : alertas.map(r => `
+            <div class="alert-item">
+              <div>
+                <div class="alert-nome">${r.nome}</div>
+                <div class="alert-cat">${r.categoria}</div>
+              </div>
+              <div class="alert-nums">
+                <div class="alert-val">R$ ${fmt(r.custo)}</div>
+                <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
+                <span class="alert-diff">+R$ ${fmt(r.custo - r.orcamento)}</span>
+              </div>
+            </div>`).join('')}
+      </div>
+
+      <!-- Atenção: 80–99% do orçamento -->
+      <div class="d-section">
+        <div class="d-section-title">🟡 Pontos de atenção (${atencao.length})</div>
+        ${atencao.length === 0
+          ? '<div class="empty-d">Nenhum item próximo do limite</div>'
+          : atencao.map(r => {
+              const p = ((r.custo / r.orcamento) * 100).toFixed(0);
+              return `
+              <div class="warn-item">
+                <div>
+                  <div class="alert-nome">${r.nome}</div>
+                  <div class="alert-cat">${r.categoria}</div>
+                </div>
+                <div class="alert-nums">
+                  <div class="warn-val">R$ ${fmt(r.custo)}</div>
+                  <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
+                  <span class="warn-diff">${p}% usado</span>
+                </div>
+              </div>`;
+            }).join('')}
+      </div>
+
+      <!-- Gráfico -->
+      <div class="d-section">
+        <div class="d-section-title">Gastos por categoria</div>
+        <div class="chart-wrap">
+          <div class="chart-canvas-wrap">
+            <canvas id="pie-chart" width="220" height="220"></canvas>
+            <div class="chart-center">
+              <div class="chart-center-val">R$ ${fmt(totalGasto)}</div>
+              <div class="chart-center-label">gasto total</div>
+            </div>
+          </div>
+          <div class="chart-legend" id="chart-legend"></div>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="d-section">
+        <div class="d-section-title">Orçado vs gasto por categoria</div>
+        <div id="cat-breakdown"></div>
+      </div>
+    `;
+
+    // Gráfico de pizza
+    const catsGasto = Object.entries(cats)
+      .filter(([, v]) => v.gasto > 0)
+      .sort((a, b) => b[1].gasto - a[1].gasto);
+
+    const ctx = document.getElementById('pie-chart').getContext('2d');
+    chartInst = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: catsGasto.map(([k]) => k),
+        datasets: [{
+          data:            catsGasto.map(([, v]) => v.gasto),
+          backgroundColor: catsGasto.map(([k]) => CORES[k] || '#888'),
+          borderColor:     '#111',
+          borderWidth:     3,
+          hoverOffset:     6,
+        }]
+      },
+      options: {
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` R$ ${fmt(ctx.parsed)} (${((ctx.parsed / totalGasto) * 100).toFixed(1)}%)`
+            }
+          }
+        }
+      }
+    });
+
+    // Legenda
+    document.getElementById('chart-legend').innerHTML = catsGasto.map(([cat, v]) => `
+      <div class="legend-item">
+        <div class="legend-left">
+          <div class="legend-dot" style="background:${CORES[cat]||'#888'}"></div>
+          <span class="legend-nome">${cat}</span>
+        </div>
+        <div class="legend-right">
+          <span class="legend-val">R$ ${fmt(v.gasto)}</span>
+          <span class="legend-pct">${totalGasto > 0 ? ((v.gasto/totalGasto)*100).toFixed(0) : 0}%</span>
+        </div>
+      </div>`).join('');
+
+    // Breakdown por categoria — inclui categorias sem orçamento (ex: "Outros")
+    const catsSorted = Object.entries(cats)
+      .filter(([, v]) => v.orc > 0 || v.gasto > 0)
+      .sort((a, b) => {
+        // categorias com orçamento ficam no topo (ordenadas por % usada)
+        // categorias sem orçamento vão para o final, ordenadas por gasto
+        const hasOrcA = a[1].orc > 0, hasOrcB = b[1].orc > 0;
+        if (hasOrcA && !hasOrcB) return -1;
+        if (!hasOrcA && hasOrcB) return 1;
+        const pa = hasOrcA ? a[1].gasto / a[1].orc : 0;
+        const pb = hasOrcB ? b[1].gasto / b[1].orc : 0;
+        return hasOrcA ? pb - pa : b[1].gasto - a[1].gasto;
+      });
+
+    document.getElementById('cat-breakdown').innerHTML = catsSorted.map(([cat, v]) => {
+      const semOrc = v.orc === 0;
+      const p      = semOrc ? 100 : (v.gasto / v.orc) * 100;
+      const rest   = v.orc - v.gasto;
+      const cor    = semOrc ? '#64748b' : p > 100 ? '#ef4444' : p >= 80 ? '#f59e0b' : (CORES[cat] || '#22c55e');
+      const cls    = semOrc ? '' : p > 100 ? 'danger' : p >= 80 ? 'warn' : '';
+      return `
+        <div class="cat-item">
+          <div class="cat-header">
+            <span class="cat-nome">${cat}</span>
+            <span class="cat-vals">
+              <strong>R$ ${fmt(v.gasto)}</strong>
+              ${semOrc ? '<span style="color:#444;font-size:11px"> sem orçamento</span>' : ` / R$ ${fmt(v.orc)}`}
+            </span>
+          </div>
+          <div class="cat-bar-bg">
+            <div class="cat-bar-fill" style="width:${Math.min(p,100)}%;background:${cor}"></div>
+          </div>
+          <div class="cat-sub">
+            <span class="cat-restante ${semOrc ? '' : rest >= 0 ? 'positivo' : 'negativo'}">
+              ${semOrc ? 'lançamento livre' : rest >= 0 ? `sobram R$ ${fmt(rest)}` : `estouro R$ ${fmt(Math.abs(rest))}`}
+            </span>
+            <span class="cat-pct ${cls}">${semOrc ? '—' : p.toFixed(0) + '%'}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  carregarContas();
+</script>
+</body>
+</html>
