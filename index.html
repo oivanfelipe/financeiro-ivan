@@ -583,7 +583,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiywVHS9UkL-0qIUE-eUccH45AjMEeqOH9oP7V2FOj_UUJ7dNKiMWFuZZeuUHZC8KQ/exec";
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdfGdh4v7QMiwR7jw7ohPESSePFubjQUIGfKmlu8cIqJziAzKjS8hucoKu5957uWDK/exec";
   const SHEET_ID      = "1UASGHz5Q9VVhgugUwGVr_hR1trnyn6d1LMLsteUKqvA";
   const DEFAULT_SHEET = "Setembro (gastos de agosto)";
   const API_KEY    = "AIzaSyDO49TOMcpMKLPnzsnvTl7pTaVIxz27Gpw";
@@ -1017,10 +1017,10 @@
     try {
       const json = await fetchJsonp(`${SCRIPT_URL}?action=read&sheet=${encodeURIComponent(mesSelecionado || DEFAULT_SHEET)}`);
       if (json.ok && json.data) {
-        const rows = new Set(CONTAS.map(c => c.row));
+        const rowsContas = new Set(CONTAS.map(c => c.row));
         json.data.forEach(r => {
-          if (rows.has(r.row) && r.custo != null) {
-            pagas[r.row] = { valor: r.custo };
+          if (rowsContas.has(r.row) && r._valorPago != null) {
+            pagas[r.row] = { valor: r._valorPago };
           }
         });
       }
