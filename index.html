@@ -527,6 +527,11 @@
       <h1>Contas</h1>
       <button class="btn-refresh" id="btn-refresh-contas" onclick="carregarContas()">↻ Atualizar</button>
     </div>
+    <div class="mes-selector" id="mes-selector-contas" style="display:none">
+      <label>Mês</label>
+      <select id="mes-select-contas" onchange="onMesChange('contas')"></select>
+      <span class="mes-arrow">▼</span>
+    </div>
     <p class="subtitle" id="contas-subtitulo">Carregando...</p>
 
     <div class="contas-total">
@@ -894,6 +899,7 @@
     if (selOutro) selOutro.value = mesSelecionado;
 
     if (contexto === 'dashboard') carregarDashboard(true);
+    if (contexto === 'contas') carregarContas();
   }
 
   // ── Tab switching ────────────────────────────────────────────────────────────
@@ -1024,7 +1030,7 @@
           }
         });
       }
-    } catch (e) { /* usa estado local */ }
+    } catch (e) { console.error('Erro ao carregar contas pagas:', e); }
 
     if (btn) { btn.disabled = false; btn.textContent = '↻ Atualizar'; }
     renderContas();
@@ -1394,6 +1400,12 @@
     if (selOrc) {
       preencherSelectMes('mes-select-orc', mesSelecionado);
       selOrc.style.display = 'flex'; // sempre visível na aba de orçamento
+    }
+
+    const selContas = document.getElementById('mes-selector-contas');
+    if (selContas) {
+      preencherSelectMes('mes-select-contas', mesSelecionado);
+      selContas.style.display = mostrarSel ? 'flex' : 'none';
     }
 
     // Atualiza títulos com o mês selecionado
