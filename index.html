@@ -52,6 +52,74 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
+    /* ── Seletor de mês ── */
+    .mes-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      padding: 10px 14px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+    }
+    .mes-selector label {
+      font-size: 12px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      margin: 0;
+    }
+    .mes-selector select {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #f0f0f0;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 0;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+    .mes-selector select option { background: #1a1a1a; color: #f0f0f0; }
+    .mes-arrow { color: #444; font-size: 10px; pointer-events: none; }
+
+    /* ── Filtro por categoria (Col A) ── */
+    .filtro-cat-wrap {
+      margin-bottom: 16px;
+    }
+    .filtro-cat-label {
+      font-size: 11px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+    .filtro-cat-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .filtro-pill {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid #2a2a2a;
+      background: #111;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .filtro-pill:hover { border-color: #444; color: #aaa; }
+    .filtro-pill.active { background: #2a2a2a; color: #fff; border-color: #3a3a3a; }
+    .filtro-pill.all { border-color: #3b82f6; color: #3b82f6; }
+    .filtro-pill.all.active { background: #1d3a6e; color: #93c5fd; border-color: #3b82f6; }
+
     /* ── Títulos ── */
     h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; color: #fff; }
     .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
@@ -370,8 +438,17 @@
        ABA: ORÇAMENTO
   ═══════════════════════════════════ -->
   <div id="tab-orcamento" class="tab-content active">
-    <h1>Orçamento Agosto</h1>
-    <p class="subtitle">Setembro (gastos de agosto)</p>
+    <h1 id="orc-titulo">Orçamento</h1>
+    <p class="subtitle" id="orc-subtitulo">Selecione o mês e lance o gasto</p>
+
+    <!-- Seletor de Mês — primeira aba -->
+    <div class="mes-selector" id="mes-selector-orc" style="display:none">
+      <label>Mês</label>
+      <select id="mes-select-orc" onchange="onMesChange('orc')">
+        <option value="" disabled>Carregando...</option>
+      </select>
+      <span class="mes-arrow">▼</span>
+    </div>
 
     <div class="field">
       <label>Categoria</label>
@@ -450,7 +527,7 @@
       <h1>Contas</h1>
       <button class="btn-refresh" id="btn-refresh-contas" onclick="carregarContas()">↻ Atualizar</button>
     </div>
-    <p class="subtitle">Agosto 2026 — vencimentos do mês</p>
+    <p class="subtitle" id="contas-subtitulo">Carregando...</p>
 
     <div class="contas-total">
       <div>
@@ -476,9 +553,24 @@
     <div class="section-header">
       <div>
         <h1>Dashboard</h1>
-        <p class="subtitle">Agosto 2026 — resumo de gastos</p>
+        <p class="subtitle" id="dash-subtitulo">Carregando...</p>
       </div>
       <button class="btn-refresh" id="btn-refresh-dash" onclick="carregarDashboard(true)">↻</button>
+    </div>
+
+    <!-- Seletor de Mês -->
+    <div class="mes-selector" id="mes-selector-dash" style="display:none">
+      <label>Mês</label>
+      <select id="mes-select-dash" onchange="onMesChange('dashboard')">
+        <option value="" disabled>Carregando...</option>
+      </select>
+      <span class="mes-arrow">▼</span>
+    </div>
+
+    <!-- Filtro por Coluna A (Categoria) -->
+    <div class="filtro-cat-wrap" id="filtro-cat-wrap" style="display:none">
+      <div class="filtro-cat-label">Filtrar por categoria</div>
+      <div class="filtro-cat-pills" id="filtro-cat-pills"></div>
     </div>
 
     <div id="dash-root">
@@ -491,9 +583,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYEj4MjjW7JudklfAOdAjxwq57YoAXQisKPO7H35B6rLff4c5alfZk1DGs8DTMU_Le/exec";
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSjvxsMw5MXb3K-x7hPDQXX_5qudGwDwKjrG13poE1EKiN33UR-BHocct8LTc_3YU/exec";
+  const SHEET_ID   = "1UASGHz5Q9VVhgugUwGVr_hR1trnyn6d1LMLsteUKqvA";
+  const API_KEY    = "AIzaSyDO49TOMcpMKLPnzsnvTl7pTaVIxz27Gpw";
 
-  // ── Dados: Orçamento ────────────────────────────────────────────────────────
+  // ── Dados: Orçamento (hardcoded — base Agosto) ─────────────────────────────
   const ITENS = {
     "Casa": [
       { row: 2,  nome: "Aluguel",               orc: 1746.09 },
@@ -512,10 +606,10 @@
     ],
     "Parcelas casa": [
       { row: 13, nome: "Geladeira (3/12)",           orc: 176.61 },
-      { row: 14, nome: "Mesa (2/11)",                 orc: 18.90  },
-      { row: 15, nome: "Máquina de lavar (2/12)",    orc: 116.00 },
-      { row: 16, nome: "Utensílios de casa (2/5)",   orc: 109.33 },
-      { row: 17, nome: "Cama Mel (14/14)",           orc: 60.85  },
+      { row: 14, nome: "Mesa (2/11)",                orc: 18.90  },
+      { row: 15, nome: "Máquina de lavar (2/12)",   orc: 116.00 },
+      { row: 16, nome: "Utensílios de casa (2/5)",  orc: 109.33 },
+      { row: 17, nome: "Cama Mel (14/14)",          orc: 60.85  },
     ],
     "Alimentação": [
       { row: 18, nome: "Mercado",                orc: 800.00  },
@@ -587,10 +681,15 @@
     "Lazer":                   "#84cc16",
   };
 
-  // ── Estado ──────────────────────────────────────────────────────────────────
-  const pagas   = {};    // row → { valor }
-  let dashData  = null;  // cache dos dados do dashboard
-  let chartInst = null;  // instância do Chart.js
+  // ── Estado global ────────────────────────────────────────────────────────────
+  const pagas   = {};
+  let dashData  = null;
+  let chartInst = null;
+
+  // Meses disponíveis (carregados da planilha via Sheets API)
+  let mesesDisponiveis = [];
+  let mesSelecionado   = '';    // nome da aba ativa no dashboard
+  let filtroCategoria  = 'Todos'; // filtro ativo na coluna A
 
   // ── Utilitários ─────────────────────────────────────────────────────────────
   function fmt(v) {
@@ -622,8 +721,6 @@
   }
 
   // Envio via iframe (write — sem CORS)
-  // overwrite=true → substitui o valor (usado nas Contas)
-  // overwrite=false (padrão) → soma ao valor existente (usado no Orçamento)
   function enviarParaScript(row, value, date, onSuccess, overwrite = false) {
     const iframe = document.createElement('iframe');
     iframe.name  = 'frame_' + row + '_' + Date.now();
@@ -636,8 +733,9 @@
     form.target  = iframe.name;
 
     const params = [['row', parseInt(row)], ['value', value]];
-    if (date)      params.push(['date', date]);
-    if (overwrite) params.push(['overwrite', 'true']);
+    if (date)          params.push(['date', date]);
+    if (overwrite)     params.push(['overwrite', 'true']);
+    if (mesSelecionado) params.push(['sheet', mesSelecionado]);
 
     params.forEach(([name, val]) => {
       const inp = document.createElement('input');
@@ -655,6 +753,147 @@
     }, 3000);
 
     if (onSuccess) onSuccess();
+  }
+
+  // Adiciona nova linha na planilha (usado para "Outros")
+  function appendParaScript(nome, categoria, value, date, onSuccess) {
+    const iframe = document.createElement('iframe');
+    iframe.name  = 'frame_append_' + Date.now();
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form  = document.createElement('form');
+    form.method = 'GET';
+    form.action = SCRIPT_URL;
+    form.target = iframe.name;
+
+    [['action', 'inserir'], ['nome', nome], ['categoria', categoria], ['value', value], ['date', date], ['sheet', mesSelecionado || '']]
+      .forEach(([n, v]) => {
+        const inp = document.createElement('input');
+        inp.type  = 'hidden';
+        inp.name  = n;
+        inp.value = v;
+        form.appendChild(inp);
+      });
+
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(() => {
+      if (form.parentNode)   form.parentNode.removeChild(form);
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 3000);
+
+    if (onSuccess) onSuccess();
+  }
+
+  // ── Carregar lista de meses via Apps Script (action=getSheets) ──────────────
+  async function carregarMeses() {
+    try {
+      const json = await fetchJsonp(`${SCRIPT_URL}?action=getSheets`);
+      if (json.ok && json.sheets) {
+        mesesDisponiveis = json.sheets;
+        return mesesDisponiveis;
+      }
+      throw new Error(json.error || 'Sem dados');
+    } catch (e) {
+      console.warn('Não foi possível carregar abas da planilha:', e.message);
+      // Fallback: nomes de meses em português
+      const nomesMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                          'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+      const mesAtual   = nomesMeses[new Date().getMonth()];
+      mesesDisponiveis = [mesAtual];
+      return mesesDisponiveis;
+    }
+  }
+
+  // ── Ler dados de uma aba via gviz (sem API key, funciona p/ planilhas públicas) ──
+  async function lerDadosAba(nomeAba) {
+    const abaEnc = encodeURIComponent(nomeAba);
+    const url    = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${abaEnc}`;
+    const resp   = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ao ler aba ' + nomeAba);
+    const text = await resp.text();
+    // gviz retorna JSONP: google.visualization.Query.setResponse({...})
+    const jsonStr = text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, '');
+    const data    = JSON.parse(jsonStr);
+    if (!data.table || !data.table.rows) return [];
+
+    // Converte a tabela gviz em array de arrays (igual ao formato Sheets v4)
+    const cols = data.table.cols.map(c => c.label || '');
+    const rows = [cols];
+    data.table.rows.forEach(r => {
+      rows.push(r.c.map(cell => (cell && cell.v != null ? String(cell.v) : '')));
+    });
+    return rows;
+  }
+
+  // Converte linhas brutas da planilha em objetos estruturados
+  // Assume estrutura: Col A = categoria, Col B = nome, Col C = orçamento, Col D = custo, Col E = status
+  function parsearLinhas(rows) {
+    if (!rows || rows.length === 0) return [];
+    const header = rows[0].map(h => (h || '').toLowerCase().trim());
+
+    // Tenta encontrar colunas por cabeçalho
+    const iCat  = header.findIndex(h => h.includes('categ') || h === 'categoria' || h === 'tipo' || h === 'grupo');
+    const iNome = header.findIndex(h => h.includes('nome') || h.includes('item') || h.includes('descrição') || h.includes('descricao'));
+    const iOrc  = header.findIndex(h => h.includes('orc') || h.includes('prev') || h.includes('budget'));
+    const iCust = header.findIndex(h => h.includes('cust') || h.includes('gast') || h.includes('real') || h.includes('valor') || h.includes('pago'));
+
+    // Se não achou cabeçalho, assume posições fixas: A=cat, B=nome, C=orc, D=custo
+    const colCat  = iCat  >= 0 ? iCat  : 0;
+    const colNome = iNome >= 0 ? iNome : 1;
+    const colOrc  = iOrc  >= 0 ? iOrc  : 2;
+    const colCust = iCust >= 0 ? iCust : 3;
+
+    const inicio = rows[0].some(c => /categ|nome|item|orc|prev|gast|cust/i.test(c)) ? 1 : 0;
+
+    return rows.slice(inicio)
+      .filter(r => r && r.length > 0 && (r[colNome] || r[colCat]))
+      .map((r, i) => {
+        const parseNum = (v) => {
+          if (!v) return null;
+          const n = parseFloat(String(v).replace(/[R$\s.]/g, '').replace(',', '.'));
+          return isNaN(n) ? null : n;
+        };
+        return {
+          row:       i + inicio + 2,  // linha na planilha (1-based, +1 cabeçalho)
+          categoria: (r[colCat]  || 'Outros').trim(),
+          nome:      (r[colNome] || '').trim(),
+          orcamento: parseNum(r[colOrc]),
+          custo:     parseNum(r[colCust]),
+        };
+      })
+      .filter(r => r.nome);
+  }
+
+  // ── Preencher selects de mês ─────────────────────────────────────────────────
+  function preencherSelectMes(selectId, valorAtual) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '';
+    mesesDisponiveis.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      if (m === valorAtual) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── Handler de troca de mês ──────────────────────────────────────────────────
+  function onMesChange(contexto) {
+    const sel = document.getElementById('mes-select-' + contexto);
+    if (!sel) return;
+    mesSelecionado = sel.value;
+    dashData = null;         // invalida cache
+    filtroCategoria = 'Todos';
+
+    // Sincroniza o outro seletor de mês
+    const outro = contexto === 'dashboard' ? 'orc' : 'dashboard';
+    const selOutro = document.getElementById('mes-select-' + outro);
+    if (selOutro) selOutro.value = mesSelecionado;
+
+    if (contexto === 'dashboard') carregarDashboard(true);
   }
 
   // ── Tab switching ────────────────────────────────────────────────────────────
@@ -718,7 +957,6 @@
     if (!cat)           { showToast('Selecione uma categoria', true); return; }
     if (!val || val<=0) { showToast('Digite um valor válido', true);  return; }
 
-    // ── Modo "Outros": adiciona nova linha na planilha ──
     if (cat === '__outros__') {
       const desc    = document.getElementById('outros-desc').value.trim();
       const catPlan = document.getElementById('outros-cat').value;
@@ -742,7 +980,6 @@
       return;
     }
 
-    // ── Modo normal: atualiza linha existente (soma) ──
     const select = document.getElementById('item');
     const row    = select.value;
     if (!row) { showToast('Selecione um item', true); return; }
@@ -750,7 +987,7 @@
     btn.disabled    = true;
     btn.textContent = 'Salvando...';
 
-    enviarParaScript(row, val, data, () => {  // data → grava data do último lançamento (col F)
+    enviarParaScript(row, val, data, () => {
       showToast('✓ Salvo na planilha!');
       valor.value = '';
       select.selectedIndex = 0;
@@ -764,43 +1001,18 @@
     });
   }
 
-  // Adiciona nova linha na planilha (usado para "Outros")
-  function appendParaScript(nome, categoria, value, date, onSuccess) {
-    const iframe = document.createElement('iframe');
-    iframe.name  = 'frame_append_' + Date.now();
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    const form  = document.createElement('form');
-    form.method = 'GET';
-    form.action = SCRIPT_URL;
-    form.target = iframe.name;
-
-    [['action', 'inserir'], ['nome', nome], ['categoria', categoria], ['value', value], ['date', date]]
-      .forEach(([n, v]) => {
-        const inp = document.createElement('input');
-        inp.type  = 'hidden';
-        inp.name  = n;
-        inp.value = v;
-        form.appendChild(inp);
-      });
-
-    document.body.appendChild(form);
-    form.submit();
-    setTimeout(() => {
-      if (form.parentNode)   form.parentNode.removeChild(form);
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    }, 3000);
-
-    if (onSuccess) onSuccess();
-  }
-
   // ── ABA: CONTAS ──────────────────────────────────────────────────────────────
   async function carregarContas() {
     const lista = document.getElementById('contas-lista');
     const btn   = document.getElementById('btn-refresh-contas');
     lista.innerHTML = '<div class="contas-loading"><div class="spinner-sm"></div> Carregando...</div>';
     if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+    // Atualiza subtítulo com o mês selecionado
+    if (mesSelecionado) {
+      const el = document.getElementById('contas-subtitulo');
+      if (el) el.textContent = mesSelecionado + ' — vencimentos do mês';
+    }
 
     try {
       const json = await fetchJsonp(`${SCRIPT_URL}?action=read`);
@@ -819,8 +1031,8 @@
   }
 
   function renderContas() {
-    const hoje    = new Date();
-    const diaHoje = hoje.getDate();
+    const hj      = new Date();
+    const diaHoje = hj.getDate();
     const lista   = document.getElementById('contas-lista');
     lista.innerHTML = '';
 
@@ -838,7 +1050,8 @@
       else if (conta.dia === diaHoje)       badge = '<span class="badge badge-hoje">Hoje</span>';
       else if (conta.dia - diaHoje <= 3)    badge = '<span class="badge badge-vence">Em breve</span>';
 
-      const vencLabel = `dia ${String(conta.dia).padStart(2,'0')}/08`;
+      const mesLabel  = mesSelecionado ? mesSelecionado.substring(0,3).toLowerCase() : '08';
+      const vencLabel = `dia ${String(conta.dia).padStart(2,'0')}/${mesLabel}`;
       const orcFmt    = conta.orc.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
       const valorPago = isPago ? pagas[conta.row].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : orcFmt;
 
@@ -896,15 +1109,14 @@
     const val   = parseFloat(input.value);
     if (!val || val <= 0) { showToast('Digite um valor válido', true); return; }
 
-    const hoje  = new Date();
-    const dd    = String(hoje.getDate()).padStart(2,'0');
-    const mm    = String(hoje.getMonth()+1).padStart(2,'0');
-    const data  = `${dd}/${mm}/${hoje.getFullYear()}`;
+    const hj   = new Date();
+    const dd   = String(hj.getDate()).padStart(2,'0');
+    const mm   = String(hj.getMonth()+1).padStart(2,'0');
+    const data = `${dd}/${mm}/${hj.getFullYear()}`;
 
-    // overwrite=true: substitui o valor pago (não soma com anterior)
     enviarParaScript(row, val, data, () => {
       pagas[row] = { valor: val };
-      dashData   = null; // invalida cache
+      dashData   = null;
       renderContas();
       showToast('✓ Conta marcada como paga!');
     }, true);
@@ -919,11 +1131,34 @@
     root.innerHTML = '<div class="contas-loading"><div class="spinner-sm"></div> Carregando...</div>';
     if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
+    // Esconde filtros enquanto carrega
+    document.getElementById('filtro-cat-wrap').style.display = 'none';
+
     try {
-      const json = await fetchJsonp(`${SCRIPT_URL}?action=read`);
-      if (!json.ok) throw new Error(json.error || 'Erro desconhecido');
-      dashData = json.data;
-      renderDashboard(dashData);
+      let rows;
+
+      if (mesSelecionado) {
+        // Lê direto da aba do mês via Sheets REST API
+        const rawRows = await lerDadosAba(mesSelecionado);
+        rows = parsearLinhas(rawRows);
+
+        // Atualiza subtítulos
+        const sub = mesSelecionado + ' — resumo de gastos';
+        ['dash-subtitulo'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = sub;
+        });
+      } else {
+        // Fallback: usa o Apps Script (comportamento original)
+        const json = await fetchJsonp(`${SCRIPT_URL}?action=read`);
+        if (!json.ok) throw new Error(json.error || 'Erro desconhecido');
+        rows = json.data;
+      }
+
+      dashData = rows;
+      filtroCategoria = 'Todos';  // reset filtro ao trocar mês
+      renderFiltrosCategoria(rows);
+      renderDashboard(rows);
     } catch (err) {
       root.innerHTML = `
         <div class="state-box error">
@@ -935,14 +1170,50 @@
     if (btn) { btn.disabled = false; btn.textContent = '↻'; }
   }
 
+  // ── Filtro por Coluna A (Categoria) ─────────────────────────────────────────
+  function renderFiltrosCategoria(rows) {
+    const wrapper = document.getElementById('filtro-cat-wrap');
+    const pills   = document.getElementById('filtro-cat-pills');
+    if (!rows || rows.length === 0) { wrapper.style.display = 'none'; return; }
+
+    // Extrai categorias únicas da Coluna A
+    const cats = ['Todos', ...new Set(rows.map(r => r.categoria).filter(Boolean))];
+
+    pills.innerHTML = cats.map(cat => `
+      <button
+        class="filtro-pill ${cat === 'Todos' ? 'all' : ''} ${filtroCategoria === cat ? 'active' : ''}"
+        onclick="aplicarFiltro('${cat.replace(/'/g, "\\'")}')"
+      >${cat}</button>
+    `).join('');
+
+    wrapper.style.display = cats.length > 2 ? 'block' : 'none';
+  }
+
+  function aplicarFiltro(categoria) {
+    filtroCategoria = categoria;
+    // Atualiza visual das pills
+    document.querySelectorAll('.filtro-pill').forEach(p => {
+      p.classList.toggle('active', p.textContent === categoria);
+    });
+    // Re-renderiza o dashboard com o filtro ativo
+    if (dashData) renderDashboard(dashData);
+  }
+
+  function filtrarRows(rows) {
+    if (!filtroCategoria || filtroCategoria === 'Todos') return rows;
+    return rows.filter(r => r.categoria === filtroCategoria);
+  }
+
+  // ── Renderizar Dashboard ─────────────────────────────────────────────────────
   function renderDashboard(rows) {
-    // Destrói chart ANTES de substituir o DOM
     if (chartInst) { chartInst.destroy(); chartInst = null; }
 
-    // Agrupa por categoria
+    // Aplica filtro por categoria (Col A)
+    const rowsFiltrados = filtrarRows(rows);
+
     const cats = {};
     let totalOrc = 0, totalGasto = 0;
-    rows.forEach(r => {
+    rowsFiltrados.forEach(r => {
       const cat = r.categoria;
       if (!cats[cat]) cats[cat] = { orc: 0, gasto: 0 };
       if (r.orcamento) { cats[cat].orc   += r.orcamento; totalOrc   += r.orcamento; }
@@ -953,8 +1224,8 @@
     const saldo  = totalOrc - totalGasto;
     const corBar = pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#22c55e';
 
-    const alertas = rows.filter(r => r.custo && r.orcamento && r.custo > r.orcamento);
-    const atencao = rows.filter(r => r.custo && r.orcamento && r.custo < r.orcamento && (r.custo / r.orcamento) >= 0.8);
+    const alertas = rowsFiltrados.filter(r => r.custo && r.orcamento && r.custo > r.orcamento);
+    const atencao = rowsFiltrados.filter(r => r.custo && r.orcamento && r.custo < r.orcamento && (r.custo / r.orcamento) >= 0.8);
 
     const root = document.getElementById('dash-root');
     root.innerHTML = `
@@ -1092,12 +1363,10 @@
         </div>
       </div>`).join('');
 
-    // Breakdown por categoria — inclui categorias sem orçamento (ex: "Outros")
+    // Breakdown por categoria
     const catsSorted = Object.entries(cats)
       .filter(([, v]) => v.orc > 0 || v.gasto > 0)
       .sort((a, b) => {
-        // categorias com orçamento ficam no topo (ordenadas por % usada)
-        // categorias sem orçamento vão para o final, ordenadas por gasto
         const hasOrcA = a[1].orc > 0, hasOrcB = b[1].orc > 0;
         if (hasOrcA && !hasOrcB) return -1;
         if (!hasOrcA && hasOrcB) return 1;
@@ -1135,7 +1404,45 @@
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────────
-  carregarContas();
+  async function init() {
+    // Carrega a lista de meses da planilha
+    await carregarMeses();
+
+    // Define o mês inicial como o último da lista (mais recente)
+    if (mesesDisponiveis.length > 0) {
+      mesSelecionado = mesesDisponiveis[mesesDisponiveis.length - 1];
+    }
+
+    // Preenche o seletor de mês no Dashboard e na aba Orçamento
+    const mostrarSel = mesesDisponiveis.length > 1;
+
+    const selDash = document.getElementById('mes-selector-dash');
+    if (selDash) {
+      preencherSelectMes('mes-select-dash', mesSelecionado);
+      selDash.style.display = mostrarSel ? 'flex' : 'none';
+    }
+
+    const selOrc = document.getElementById('mes-selector-orc');
+    if (selOrc) {
+      preencherSelectMes('mes-select-orc', mesSelecionado);
+      selOrc.style.display = 'flex'; // sempre visível na aba de orçamento
+    }
+
+    // Atualiza títulos com o mês selecionado
+    const nomesMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                        'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const mesAtual   = mesSelecionado || nomesMeses[new Date().getMonth()];
+    const anoAtual   = new Date().getFullYear();
+
+    const orcTitulo = document.getElementById('orc-titulo');
+    if (orcTitulo) orcTitulo.textContent = 'Orçamento';
+
+    // Carrega as abas
+    carregarContas();
+    // Dashboard carrega quando o usuário abrir a aba
+  }
+
+  init();
 </script>
 </body>
 </html>
