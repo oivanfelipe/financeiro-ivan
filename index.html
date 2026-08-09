@@ -583,7 +583,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSjvxsMw5MXb3K-x7hPDQXX_5qudGwDwKjrG13poE1EKiN33UR-BHocct8LTc_3YU/exec";
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFzjVtdl228pa10h323yACnSwuHWupBYw0TeWJU-7jDNw_-59DWj2EXoYO3AYY6MEG/exec";
   const SHEET_ID   = "1UASGHz5Q9VVhgugUwGVr_hR1trnyn6d1LMLsteUKqvA";
   const API_KEY    = "AIzaSyDO49TOMcpMKLPnzsnvTl7pTaVIxz27Gpw";
 
@@ -720,10 +720,10 @@
     });
   }
 
-  // Envio via iframe (write — sem CORS)
-  function enviarParaScript(row, value, date, onSuccess, overwrite = false) {
+  // Envio via iframe — busca o item pelo NOME na planilha (writeByName)
+  function enviarParaScript(nome, value, date, onSuccess) {
     const iframe = document.createElement('iframe');
-    iframe.name  = 'frame_' + row + '_' + Date.now();
+    iframe.name  = 'frame_' + Date.now();
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
 
@@ -732,9 +732,8 @@
     form.action  = SCRIPT_URL;
     form.target  = iframe.name;
 
-    const params = [['row', parseInt(row)], ['value', value]];
-    if (date)          params.push(['date', date]);
-    if (overwrite)     params.push(['overwrite', 'true']);
+    const params = [['action', 'writeByName'], ['nome', nome], ['value', value]];
+    if (date)           params.push(['date', date]);
     if (mesSelecionado) params.push(['sheet', mesSelecionado]);
 
     params.forEach(([name, val]) => {
@@ -981,13 +980,13 @@
     }
 
     const select = document.getElementById('item');
-    const row    = select.value;
-    if (!row) { showToast('Selecione um item', true); return; }
+    const nome   = select.options[select.selectedIndex]?.textContent;
+    if (!nome) { showToast('Selecione um item', true); return; }
 
     btn.disabled    = true;
     btn.textContent = 'Salvando...';
 
-    enviarParaScript(row, val, data, () => {
+    enviarParaScript(nome, val, data, () => {
       showToast('✓ Salvo na planilha!');
       valor.value = '';
       select.selectedIndex = 0;
@@ -1078,7 +1077,7 @@
               <span>R$</span>
               <input type="number" id="pay-input-${conta.row}" value="${conta.orc}" step="0.01" min="0" />
             </div>
-            <button class="btn-confirmar" onclick="confirmarPagamento(${conta.row})">✓ Confirmar</button>
+            <button class="btn-confirmar" onclick="confirmarPagamento(${conta.row}, '${conta.nome.replace(/'/g,"\\'")}')">✓ Confirmar</button>
             <button class="btn-cancelar"  onclick="fecharPagamento(${conta.row})">✕</button>
           </div>
         </div>` : ''}
@@ -1104,7 +1103,7 @@
     if (form) form.classList.remove('open');
   }
 
-  function confirmarPagamento(row) {
+  function confirmarPagamento(row, nome) {
     const input = document.getElementById(`pay-input-${row}`);
     const val   = parseFloat(input.value);
     if (!val || val <= 0) { showToast('Digite um valor válido', true); return; }
@@ -1114,12 +1113,12 @@
     const mm   = String(hj.getMonth()+1).padStart(2,'0');
     const data = `${dd}/${mm}/${hj.getFullYear()}`;
 
-    enviarParaScript(row, val, data, () => {
+    enviarParaScript(nome, val, data, () => {
       pagas[row] = { valor: val };
       dashData   = null;
       renderContas();
       showToast('✓ Conta marcada como paga!');
-    }, true);
+    });
   }
 
   // ── ABA: DASHBOARD ───────────────────────────────────────────────────────────
@@ -1130,72 +1129,63 @@
     const btn  = document.getElementById('btn-refresh-dash');
     root.innerHTML = '<div class="contas-loading"><div class="spinner-sm"></div> Carregando...</div>';
     if (btn) { btn.disabled = true; btn.textContent = '...'; }
-
-    // Esconde filtros enquanto carrega
     document.getElementById('filtro-cat-wrap').style.display = 'none';
 
     try {
-      let rows;
+      const sheet = mesSelecionado || '';
+      const json  = await fetchJsonp(`${SCRIPT_URL}?action=read&sheet=${encodeURIComponent(sheet)}`);
+      if (!json.ok) throw new Error(json.error || 'Erro ao ler planilha');
 
-      if (mesSelecionado) {
-        // Lê direto da aba do mês via Sheets REST API
-        const rawRows = await lerDadosAba(mesSelecionado);
-        rows = parsearLinhas(rawRows);
+      // Normaliza: Coluna A = "Detalhes da despesa", C = "Categoria", D = "Orçamento", E = "Custo"
+      const rows = (json.data || []).map(r => ({
+        nome:      String(r['Detalhes da despesa'] || '').trim(),
+        categoria: String(r['Categoria']           || 'Outros').trim(),
+        orcamento: parseNum(r['Orçamento']),
+        custo:     parseNum(r['Custo']),
+        row:       r.row,
+      })).filter(r => r.nome);
 
-        // Atualiza subtítulos
-        const sub = mesSelecionado + ' — resumo de gastos';
-        ['dash-subtitulo'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.textContent = sub;
-        });
-      } else {
-        // Fallback: usa o Apps Script (comportamento original)
-        const json = await fetchJsonp(`${SCRIPT_URL}?action=read`);
-        if (!json.ok) throw new Error(json.error || 'Erro desconhecido');
-        rows = json.data;
-      }
+      const el = document.getElementById('dash-subtitulo');
+      if (el) el.textContent = (sheet || 'Mês atual') + ' — detalhes por item';
 
       dashData = rows;
-      filtroCategoria = 'Todos';  // reset filtro ao trocar mês
+      filtroCategoria = 'Todos';
       renderFiltrosCategoria(rows);
       renderDashboard(rows);
     } catch (err) {
-      root.innerHTML = `
-        <div class="state-box error">
-          ⚠️ Não foi possível carregar os dados.<br>
-          <span style="font-size:12px;color:#555;margin-top:8px;display:block">${err.message}</span>
-        </div>`;
+      root.innerHTML = `<div class="state-box error">⚠️ Não foi possível carregar os dados.<br>
+        <span style="font-size:12px;color:#555;margin-top:8px;display:block">${err.message}</span></div>`;
     }
 
     if (btn) { btn.disabled = false; btn.textContent = '↻'; }
   }
 
-  // ── Filtro por Coluna A (Categoria) ─────────────────────────────────────────
+  function parseNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = parseFloat(String(v).replace(/[R$\s.]/g, '').replace(',', '.'));
+    return isNaN(n) ? null : n;
+  }
+
+  // ── Filtro por Categoria ─────────────────────────────────────────────────────
   function renderFiltrosCategoria(rows) {
     const wrapper = document.getElementById('filtro-cat-wrap');
     const pills   = document.getElementById('filtro-cat-pills');
     if (!rows || rows.length === 0) { wrapper.style.display = 'none'; return; }
 
-    // Extrai categorias únicas da Coluna A
     const cats = ['Todos', ...new Set(rows.map(r => r.categoria).filter(Boolean))];
-
     pills.innerHTML = cats.map(cat => `
-      <button
-        class="filtro-pill ${cat === 'Todos' ? 'all' : ''} ${filtroCategoria === cat ? 'active' : ''}"
-        onclick="aplicarFiltro('${cat.replace(/'/g, "\\'")}')"
-      >${cat}</button>
-    `).join('');
-
-    wrapper.style.display = cats.length > 2 ? 'block' : 'none';
+      <button class="filtro-pill ${filtroCategoria === cat ? 'active' : ''}"
+        onclick="aplicarFiltro('${cat.replace(/'/g, "\\'")}')">
+        ${cat}
+      </button>`).join('');
+    wrapper.style.display = 'block';
   }
 
   function aplicarFiltro(categoria) {
     filtroCategoria = categoria;
-    // Atualiza visual das pills
     document.querySelectorAll('.filtro-pill').forEach(p => {
-      p.classList.toggle('active', p.textContent === categoria);
+      p.classList.toggle('active', p.textContent.trim() === categoria);
     });
-    // Re-renderiza o dashboard com o filtro ativo
     if (dashData) renderDashboard(dashData);
   }
 
@@ -1208,14 +1198,15 @@
   function renderDashboard(rows) {
     if (chartInst) { chartInst.destroy(); chartInst = null; }
 
-    // Aplica filtro por categoria (Col A)
     const rowsFiltrados = filtrarRows(rows);
 
+    // Agrupa por categoria com lista de itens
     const cats = {};
     let totalOrc = 0, totalGasto = 0;
     rowsFiltrados.forEach(r => {
       const cat = r.categoria;
-      if (!cats[cat]) cats[cat] = { orc: 0, gasto: 0 };
+      if (!cats[cat]) cats[cat] = { orc: 0, gasto: 0, itens: [] };
+      cats[cat].itens.push(r);
       if (r.orcamento) { cats[cat].orc   += r.orcamento; totalOrc   += r.orcamento; }
       if (r.custo)     { cats[cat].gasto += r.custo;     totalGasto += r.custo;     }
     });
@@ -1229,7 +1220,6 @@
 
     const root = document.getElementById('dash-root');
     root.innerHTML = `
-      <!-- Cards -->
       <div class="dash-cards">
         <div class="dash-card">
           <div class="dash-card-label">Total orçado</div>
@@ -1256,48 +1246,34 @@
         </div>
       </div>
 
-      <!-- Alertas: acima do orçamento -->
+      ${alertas.length > 0 ? `
       <div class="d-section">
         <div class="d-section-title">🔴 Acima do orçamento (${alertas.length})</div>
-        ${alertas.length === 0
-          ? '<div class="no-alerts">✓ Nenhum item acima do orçamento</div>'
-          : alertas.map(r => `
-            <div class="alert-item">
-              <div>
-                <div class="alert-nome">${r.nome}</div>
-                <div class="alert-cat">${r.categoria}</div>
-              </div>
-              <div class="alert-nums">
-                <div class="alert-val">R$ ${fmt(r.custo)}</div>
-                <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
-                <span class="alert-diff">+R$ ${fmt(r.custo - r.orcamento)}</span>
-              </div>
-            </div>`).join('')}
-      </div>
+        ${alertas.map(r => `
+          <div class="alert-item">
+            <div><div class="alert-nome">${r.nome}</div><div class="alert-cat">${r.categoria}</div></div>
+            <div class="alert-nums">
+              <div class="alert-val">R$ ${fmt(r.custo)}</div>
+              <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
+              <span class="alert-diff">+R$ ${fmt(r.custo - r.orcamento)}</span>
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
 
-      <!-- Atenção: 80–99% do orçamento -->
+      ${atencao.length > 0 ? `
       <div class="d-section">
-        <div class="d-section-title">🟡 Pontos de atenção (${atencao.length})</div>
-        ${atencao.length === 0
-          ? '<div class="empty-d">Nenhum item próximo do limite</div>'
-          : atencao.map(r => {
-              const p = ((r.custo / r.orcamento) * 100).toFixed(0);
-              return `
-              <div class="warn-item">
-                <div>
-                  <div class="alert-nome">${r.nome}</div>
-                  <div class="alert-cat">${r.categoria}</div>
-                </div>
-                <div class="alert-nums">
-                  <div class="warn-val">R$ ${fmt(r.custo)}</div>
-                  <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
-                  <span class="warn-diff">${p}% usado</span>
-                </div>
-              </div>`;
-            }).join('')}
-      </div>
+        <div class="d-section-title">🟡 Atenção (${atencao.length})</div>
+        ${atencao.map(r => `
+          <div class="warn-item">
+            <div><div class="alert-nome">${r.nome}</div><div class="alert-cat">${r.categoria}</div></div>
+            <div class="alert-nums">
+              <div class="warn-val">R$ ${fmt(r.custo)}</div>
+              <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
+              <span class="warn-diff">${((r.custo/r.orcamento)*100).toFixed(0)}% usado</span>
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
 
-      <!-- Gráfico -->
       <div class="d-section">
         <div class="d-section-title">Gastos por categoria</div>
         <div class="chart-wrap">
@@ -1312,67 +1288,37 @@
         </div>
       </div>
 
-      <!-- Breakdown -->
       <div class="d-section">
-        <div class="d-section-title">Orçado vs gasto por categoria</div>
+        <div class="d-section-title">Detalhes por categoria e item</div>
         <div id="cat-breakdown"></div>
       </div>
     `;
 
-    // Gráfico de pizza
-    const catsGasto = Object.entries(cats)
-      .filter(([, v]) => v.gasto > 0)
-      .sort((a, b) => b[1].gasto - a[1].gasto);
-
+    // Gráfico
+    const catsGasto = Object.entries(cats).filter(([, v]) => v.gasto > 0).sort((a,b) => b[1].gasto - a[1].gasto);
     const ctx = document.getElementById('pie-chart').getContext('2d');
     chartInst = new Chart(ctx, {
       type: 'doughnut',
       data: {
         labels: catsGasto.map(([k]) => k),
-        datasets: [{
-          data:            catsGasto.map(([, v]) => v.gasto),
-          backgroundColor: catsGasto.map(([k]) => CORES[k] || '#888'),
-          borderColor:     '#111',
-          borderWidth:     3,
-          hoverOffset:     6,
-        }]
+        datasets: [{ data: catsGasto.map(([,v]) => v.gasto), backgroundColor: catsGasto.map(([k]) => CORES[k] || '#888'), borderColor: '#111', borderWidth: 3, hoverOffset: 6 }]
       },
-      options: {
-        cutout: '68%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ` R$ ${fmt(ctx.parsed)} (${((ctx.parsed / totalGasto) * 100).toFixed(1)}%)`
-            }
-          }
-        }
-      }
+      options: { cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` R$ ${fmt(c.parsed)} (${((c.parsed/totalGasto)*100).toFixed(1)}%)` } } } }
     });
 
-    // Legenda
     document.getElementById('chart-legend').innerHTML = catsGasto.map(([cat, v]) => `
       <div class="legend-item">
-        <div class="legend-left">
-          <div class="legend-dot" style="background:${CORES[cat]||'#888'}"></div>
-          <span class="legend-nome">${cat}</span>
-        </div>
-        <div class="legend-right">
-          <span class="legend-val">R$ ${fmt(v.gasto)}</span>
-          <span class="legend-pct">${totalGasto > 0 ? ((v.gasto/totalGasto)*100).toFixed(0) : 0}%</span>
-        </div>
+        <div class="legend-left"><div class="legend-dot" style="background:${CORES[cat]||'#888'}"></div><span class="legend-nome">${cat}</span></div>
+        <div class="legend-right"><span class="legend-val">R$ ${fmt(v.gasto)}</span><span class="legend-pct">${totalGasto > 0 ? ((v.gasto/totalGasto)*100).toFixed(0) : 0}%</span></div>
       </div>`).join('');
 
-    // Breakdown por categoria
+    // Breakdown por categoria com itens (Col A)
     const catsSorted = Object.entries(cats)
       .filter(([, v]) => v.orc > 0 || v.gasto > 0)
       .sort((a, b) => {
-        const hasOrcA = a[1].orc > 0, hasOrcB = b[1].orc > 0;
-        if (hasOrcA && !hasOrcB) return -1;
-        if (!hasOrcA && hasOrcB) return 1;
-        const pa = hasOrcA ? a[1].gasto / a[1].orc : 0;
-        const pb = hasOrcB ? b[1].gasto / b[1].orc : 0;
-        return hasOrcA ? pb - pa : b[1].gasto - a[1].gasto;
+        const pa = a[1].orc > 0 ? a[1].gasto / a[1].orc : 0;
+        const pb = b[1].orc > 0 ? b[1].gasto / b[1].orc : 0;
+        return pb - pa;
       });
 
     document.getElementById('cat-breakdown').innerHTML = catsSorted.map(([cat, v]) => {
@@ -1381,24 +1327,36 @@
       const rest   = v.orc - v.gasto;
       const cor    = semOrc ? '#64748b' : p > 100 ? '#ef4444' : p >= 80 ? '#f59e0b' : (CORES[cat] || '#22c55e');
       const cls    = semOrc ? '' : p > 100 ? 'danger' : p >= 80 ? 'warn' : '';
+
+      // Lista cada item (Col A) dentro da categoria
+      const itensHtml = v.itens.map(item => {
+        const ip  = (item.orcamento && item.custo) ? (item.custo / item.orcamento * 100).toFixed(0) : null;
+        const cor2 = !ip ? '#444' : ip > 100 ? '#ef4444' : ip >= 80 ? '#f59e0b' : '#555';
+        const custoStr = item.custo != null ? `R$ ${fmt(item.custo)}` : '—';
+        const orcStr   = item.orcamento != null ? `/ R$ ${fmt(item.orcamento)}` : '';
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1a1a1a;font-size:12px;">
+            <span style="color:#bbb;flex:1">${item.nome}</span>
+            <span style="color:#777;margin-right:8px;font-size:11px">${orcStr}</span>
+            <span style="color:${cor2};font-weight:500;min-width:70px;text-align:right">${custoStr}</span>
+            ${ip ? `<span style="color:${cor2};font-size:10px;margin-left:8px;min-width:34px;text-align:right">${ip}%</span>` : '<span style="min-width:42px"></span>'}
+          </div>`;
+      }).join('');
+
       return `
         <div class="cat-item">
           <div class="cat-header">
             <span class="cat-nome">${cat}</span>
-            <span class="cat-vals">
-              <strong>R$ ${fmt(v.gasto)}</strong>
-              ${semOrc ? '<span style="color:#444;font-size:11px"> sem orçamento</span>' : ` / R$ ${fmt(v.orc)}`}
-            </span>
+            <span class="cat-vals"><strong>R$ ${fmt(v.gasto)}</strong>${semOrc ? '' : ` / R$ ${fmt(v.orc)}`}</span>
           </div>
-          <div class="cat-bar-bg">
-            <div class="cat-bar-fill" style="width:${Math.min(p,100)}%;background:${cor}"></div>
-          </div>
+          <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${Math.min(p,100)}%;background:${cor}"></div></div>
           <div class="cat-sub">
             <span class="cat-restante ${semOrc ? '' : rest >= 0 ? 'positivo' : 'negativo'}">
-              ${semOrc ? 'lançamento livre' : rest >= 0 ? `sobram R$ ${fmt(rest)}` : `estouro R$ ${fmt(Math.abs(rest))}`}
+              ${semOrc ? 'sem orçamento' : rest >= 0 ? `sobram R$ ${fmt(rest)}` : `estouro R$ ${fmt(Math.abs(rest))}`}
             </span>
             <span class="cat-pct ${cls}">${semOrc ? '—' : p.toFixed(0) + '%'}</span>
           </div>
+          <div style="margin-top:8px;padding-top:4px;border-top:1px solid #222">${itensHtml}</div>
         </div>`;
     }).join('');
   }
