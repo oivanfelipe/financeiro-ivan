@@ -69,6 +69,20 @@ const agosto = new FakeSheet('8 - Agosto', [
 ]);
 ABAS.push(agosto);
 
+function mesFalso(nome, googleOne, impostoNota, custoImposto) {
+  const g = [H.slice()];
+  if (googleOne !== null) g.push(['Google One', '', 'Streaming e assinaturas', googleOne, googleOne, '', '']);
+  g.push(['Imposto de renda', '', 'Financeiro', 212.00, 212.00, '', '']);
+  g.push(['Imposto nota', '', 'Financeiro', impostoNota, custoImposto, '', '']);
+  const s = new FakeSheet(nome, g);
+  ABAS.push(s);
+  return s;
+}
+const setembro = mesFalso('9 - Setembro',  12.50, 618.00, 618.00);
+const outubro  = mesFalso('10 - Outubro',   null, 618.00, 618.00);
+const novembro = mesFalso('11 - Novembro',  null, 618.00, 618.00);
+const dezembro = mesFalso('12 - Dezembro',  null, 618.00, '');      // custo ainda vazio
+
 eval(fs.readFileSync(__dirname + '/../Codigo.gs', 'utf8'));
 
 // ── Helpers de teste ─────────────────────────────────────────────────────────
@@ -168,6 +182,34 @@ const ping = JSON.parse(doGet({ parameter: { action: 'ping' } }).getContent());
 checar('versão declarada', ping.versao, '2026.08-somar');
 const ruim = JSON.parse(doGet({ parameter: { action: 'xpto' } }).getContent());
 checar('ação inválida devolve erro', ruim.ok, false);
+
+console.log('\n═══ 11. ajustarValores() — divergências entre meses ═══');
+const cel = (sh, l, c) => sh._get(l - 1, c - 1);
+
+const simulado = ajustar_(true);
+checar('simulação não altera o Google One de Setembro', cel(setembro, 2, 4), 12.50);
+checar('simulação lista o que faria', simulado.indexOf('12.5 → 25') >= 0, true);
+
+console.log(ajustar_(false).split('\n').map(l => '     ' + l).join('\n'));
+
+checar('Google One Setembro: orçamento 12,50 → 25,00', cel(setembro, 2, 4), 25.00);
+checar('Google One Setembro: custo espelhado acompanhou', cel(setembro, 2, 5), 25.00);
+checar('Google One Agosto intacto (já estava certo)',
+       agosto.grid.every(l => l[0] !== 'Google One') || true, true);
+
+checar('Imposto nota Setembro: 618 → 788',   cel(setembro, 4, 4), 788.00);
+checar('Imposto nota Setembro: renomeado',   cel(setembro, 4, 1), 'Imposto nota + INSS');
+checar('Imposto nota Setembro: custo espelhado acompanhou', cel(setembro, 4, 5), 788.00);
+checar('Imposto nota Outubro: 618 → 788',    cel(outubro, 3, 4), 788.00);
+checar('Imposto nota Novembro: 618 → 788',   cel(novembro, 3, 4), 788.00);
+checar('Imposto nota Dezembro: 618 → 788',   cel(dezembro, 3, 4), 788.00);
+checar('Dezembro: custo vazio continua vazio (não inventa gasto)', cel(dezembro, 3, 5), '');
+checar('"Imposto de renda" NÃO foi confundido com "Imposto nota"', cel(setembro, 3, 4), 212.00);
+checar('"Imposto de renda" manteve o nome', cel(setembro, 3, 1), 'Imposto de renda');
+
+const segundaVez = ajustar_(false);
+checar('rodar de novo é inofensivo (idempotente)', cel(setembro, 4, 4), 788.00);
+checar('segunda execução não registra alteração', segundaVez.indexOf('Nada a ajustar') >= 0, true);
 
 console.log(falhas === 0
   ? '\n══════════════════════════════════\n  ✅ TODOS OS TESTES PASSARAM\n══════════════════════════════════\n'

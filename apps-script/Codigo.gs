@@ -543,3 +543,104 @@ function corrigir_(dryRun) {
   Logger.log(texto);
   return texto;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJUSTE DE VALORES PREVISTOS — rodar na mão, uma vez
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Divergências de orçamento entre meses, confirmadas pelo Ivan em 14/08/2026.
+   A tabela abaixo é a fonte da verdade: para incluir um novo acerto, basta
+   acrescentar uma entrada aqui.
+
+   Rode PRIMEIRO simularAjusteValores() e leia o log. Só depois ajustarValores().
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+var AJUSTES_PREVISTOS = [
+  {
+    item: 'Google One',
+    abas: ['setembro'],
+    orcamentoDe: 12.50,
+    orcamentoPara: 25.00,
+    motivo: 'Agosto foi pago a R$ 25,00; o 12,50 era o preço antigo do plano'
+  },
+  {
+    item: 'Imposto nota',
+    abas: ['setembro', 'outubro', 'novembro', 'dezembro'],
+    renomearPara: 'Imposto nota + INSS',
+    orcamentoDe: 618.00,
+    orcamentoPara: 788.00,
+    motivo: 'o INSS (R$ 170,00) continua devido e se perdeu ao copiar o mês'
+  }
+];
+
+function simularAjusteValores() { return ajustar_(true); }
+function ajustarValores()       { return ajustar_(false); }
+
+function mesmoValor_(a, b) {
+  return a !== null && b !== null && Math.abs(a - b) < 0.005;
+}
+
+function ajustar_(dryRun) {
+  var ss  = SpreadsheetApp.openById(SHEET_ID);
+  var log = [];
+
+  ss.getSheets().forEach(function (sheet) {
+    var aba     = sheet.getName();
+    var abaNorm = normalizar_(aba);
+    var cols    = mapearColunas_(sheet);
+
+    AJUSTES_PREVISTOS.forEach(function (ajuste) {
+      var vale = !ajuste.abas || ajuste.abas.some(function (a) {
+        return abaNorm.indexOf(normalizar_(a)) >= 0;
+      });
+      if (!vale) return;
+
+      var linha = localizarLinha_(sheet, cols, ajuste.item, 0);
+      if (!linha) return;
+
+      var orcAtual = parseValor_(sheet.getRange(linha, cols.orcamento).getValue());
+
+      // Trava de idempotência: só mexe se o valor ainda for o antigo.
+      // Rodar de novo, ou depois de um acerto manual, não faz nada.
+      if (!mesmoValor_(orcAtual, ajuste.orcamentoDe)) {
+        if (!mesmoValor_(orcAtual, ajuste.orcamentoPara)) {
+          log.push('[' + aba + '] L' + linha + ' "' + ajuste.item + '": PULADO — ' +
+                   'orçamento é ' + orcAtual + ', esperava ' + ajuste.orcamentoDe +
+                   ' (confira na mão)');
+        }
+        return;
+      }
+
+      log.push('[' + aba + '] L' + linha + ' "' + ajuste.item + '": orçamento ' +
+               ajuste.orcamentoDe + ' → ' + ajuste.orcamentoPara + ' (' + ajuste.motivo + ')');
+      if (!dryRun) sheet.getRange(linha, cols.orcamento).setValue(ajuste.orcamentoPara);
+
+      // O custo destes meses futuros é um espelho do previsto, preenchido ao
+      // copiar a aba. Se ainda for o valor antigo, acompanha o acerto; se for
+      // um gasto real já lançado, fica como está.
+      var custoAtual = parseValor_(sheet.getRange(linha, cols.custo).getValue());
+      if (mesmoValor_(custoAtual, ajuste.orcamentoDe)) {
+        log.push('[' + aba + '] L' + linha + ' "' + ajuste.item + '": custo espelhado ' +
+                 ajuste.orcamentoDe + ' → ' + ajuste.orcamentoPara);
+        if (!dryRun) sheet.getRange(linha, cols.custo).setValue(ajuste.orcamentoPara);
+      }
+
+      if (ajuste.renomearPara) {
+        var nomeAtual = String(sheet.getRange(linha, cols.nome).getValue() || '').trim();
+        if (normalizar_(nomeAtual) !== normalizar_(ajuste.renomearPara)) {
+          log.push('[' + aba + '] L' + linha + ': "' + nomeAtual + '" → "' + ajuste.renomearPara + '"');
+          if (!dryRun) sheet.getRange(linha, cols.nome).setValue(ajuste.renomearPara);
+        }
+      }
+    });
+  });
+
+  if (!dryRun) SpreadsheetApp.flush();
+
+  var cabecalho = (dryRun ? '── SIMULAÇÃO (nada foi alterado) ──'
+                          : '── AJUSTES APLICADOS ──') + ' ' + log.length + ' linha(s) de registro';
+  var texto = [cabecalho].concat(log.length ? log : ['Nada a ajustar.']).join('\n');
+  Logger.log(texto);
+  return texto;
+}

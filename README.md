@@ -94,12 +94,22 @@ Se o Chart.js do CDN não carregasse, a exceção subia e as **três abas** exib
 "não foi possível carregar os dados", mesmo com os dados já em mãos. Cada aba
 agora é renderizada isoladamente e o gráfico é opcional.
 
+### 8. Orçamentos divergentes entre meses
+
+Dois itens tinham previsto inconsistente de um mês para o outro. Confirmados com
+o Ivan e acertados por `ajustarValores()`:
+
+| Item | Onde | De | Para | Por quê |
+|------|------|-----|------|---------|
+| Google One | Setembro | R$ 12,50 | R$ 25,00 | Agosto foi pago a R$ 25,00; 12,50 era o preço antigo |
+| Imposto nota → **+ INSS** | Setembro a Dezembro | R$ 618,00 | R$ 788,00 | o INSS (R$ 170,00) continua devido e se perdeu ao copiar o mês |
+
 ---
 
 ## Testes
 
 ```bash
-node apps-script/testes/teste-backend.js    # 40 checagens da lógica do Codigo.gs
+node apps-script/testes/teste-backend.js    # 67 checagens da lógica do Codigo.gs
 node apps-script/testes/teste-frontend.js   # 26 checagens do index.html no Chromium
 ```
 

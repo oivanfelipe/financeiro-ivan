@@ -65,6 +65,32 @@ Linhas corretas não são tocadas. Ainda assim, se quiser rede de segurança:
 
 ---
 
+## Acertar os orçamentos divergentes (opcional, roda uma vez)
+
+Mesma mecânica: rode **`simularAjusteValores`**, leia o registro, depois
+**`ajustarValores`**.
+
+| Item | Onde | De | Para |
+|------|------|-----|------|
+| Google One | Setembro | R$ 12,50 | **R$ 25,00** |
+| Imposto nota → **Imposto nota + INSS** | Setembro a Dezembro | R$ 618,00 | **R$ 788,00** |
+
+A tabela `AJUSTES_PREVISTOS` no fim do `Codigo.gs` é a fonte da verdade — para
+incluir um novo acerto, basta acrescentar uma entrada lá.
+
+Três garantias:
+
+- **Idempotente.** Só altera se o valor ainda for o antigo. Rodar duas vezes não
+  faz nada; se você já acertou na mão, ele avisa e pula.
+- **Custo espelhado.** Nesses meses futuros o Custo é uma cópia do previsto,
+  preenchida ao copiar a aba. Se ainda for o valor antigo, acompanha o acerto.
+  Se já houver gasto real lançado, fica como está — em Dezembro o Custo do
+  Imposto nota está vazio e continua vazio.
+- **Sem confusão de nome.** "Imposto de renda" não é confundido com
+  "Imposto nota", e há teste cobrindo exatamente isso.
+
+---
+
 ## Contrato da API
 
 Todas as chamadas são `GET` e aceitam `&callback=` para JSONP.
