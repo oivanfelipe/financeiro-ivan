@@ -383,6 +383,7 @@ let abaAtiva        = 'orcamento';
 let filtroCategoria = 'Todos';
 let chartInst       = null;
 let modoLancamento  = 'somar';   // 'somar' | 'substituir'
+let enviando        = false;      // trava contra duplo envio
 let carregando      = false;
 
 // ── Utilitários ─────────────────────────────────────────────────────────────
@@ -739,6 +740,7 @@ function atualizarPreview() {
 }
 
 async function salvarLancamento() {
+  if (enviando) return;
   const cat   = document.getElementById('f-categoria').value;
   const input = document.getElementById('f-valor');
   const btn   = document.getElementById('f-salvar');
@@ -765,6 +767,7 @@ async function salvarLancamento() {
     };
   }
 
+  enviando = true;
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
     const res = await chamarScript(params);
@@ -788,6 +791,7 @@ async function salvarLancamento() {
   } catch (e) {
     showToast('✕ ' + e.message, true);
   } finally {
+    enviando = false;
     const b = document.getElementById('f-salvar');
     if (b) { b.disabled = false; b.textContent = 'Salvar na planilha'; }
   }
@@ -927,6 +931,7 @@ function fecharPagamento(row) {
 }
 
 async function confirmarPagamento(row) {
+  if (enviando) return;
   const item  = itens.find(i => i.row === row);
   const input = document.getElementById(`pay-input-${row}`);
   if (!item || !input) return;
@@ -935,6 +940,7 @@ async function confirmarPagamento(row) {
   if (!valor || valor <= 0) { showToast('Digite um valor válido', true); return; }
 
   const btn = input.closest('.pay-form-row').querySelector('.btn-confirmar');
+  enviando = true;
   btn.disabled = true; btn.textContent = '...';
 
   try {
@@ -950,7 +956,10 @@ async function confirmarPagamento(row) {
     showToast(`✓ ${res.nome}: R$ ${fmt(res.total)} na coluna Custo`);
   } catch (e) {
     showToast('✕ ' + e.message, true);
-    btn.disabled = false; btn.textContent = '✓ Confirmar';
+  } finally {
+    enviando = false;
+    const b = input.closest('.pay-form-row')?.querySelector('.btn-confirmar');
+    if (b) { b.disabled = false; b.textContent = '✓ Confirmar'; }
   }
 }
 
