@@ -775,9 +775,10 @@ async function salvarLancamento() {
     conferirVersao(res);
 
     aplicarResultado(res);
+    const prefixo = res.reaproveitou ? `✓ Item já existia — somou em "${res.nome}": ` : `✓ ${res.nome}: `;
     showToast(res.modo === 'substituir'
-      ? `✓ ${res.nome}: R$ ${fmt(res.total)}`
-      : `✓ ${res.nome}: R$ ${fmt(res.anterior)} + R$ ${fmt(res.lancado)} = R$ ${fmt(res.total)}`);
+      ? `${prefixo}R$ ${fmt(res.total)}`
+      : `${prefixo}R$ ${fmt(res.anterior)} + R$ ${fmt(res.lancado)} = R$ ${fmt(res.total)}`);
 
     // Limpa o formulário mantendo a categoria, que costuma repetir
     const valorEl = document.getElementById('f-valor');

@@ -298,7 +298,13 @@ function lerAba_(nomeAba) {
  * Confere primeiro a linha sugerida pelo app (rápido e à prova de itens de
  * nome parecido); se o nome de lá não bater, procura pelo nome.
  */
-function localizarLinha_(sheet, cols, nome, rowSugerida) {
+/**
+ * strict=true  → só exact match (usado pelo inserirLinha_ para não confundir
+ *                "Barba" com "Barbeiro").
+ * strict=false → também aceita substring bidirecional (usado pelo lancarCusto_
+ *                para tolerar acentos/espaços ligeiramente diferentes).
+ */
+function localizarLinha_(sheet, cols, nome, rowSugerida, strict) {
   var ultima = sheet.getLastRow();
   if (ultima < 2) return 0;
 
@@ -313,8 +319,10 @@ function localizarLinha_(sheet, cols, nome, rowSugerida) {
   var i = nomes.indexOf(alvo);
   if (i >= 0) return i + 2;
 
-  for (var j = 0; j < nomes.length; j++) {
-    if (nomes[j] && (nomes[j].indexOf(alvo) >= 0 || alvo.indexOf(nomes[j]) >= 0)) return j + 2;
+  if (!strict) {
+    for (var j = 0; j < nomes.length; j++) {
+      if (nomes[j] && (nomes[j].indexOf(alvo) >= 0 || alvo.indexOf(nomes[j]) >= 0)) return j + 2;
+    }
   }
   return 0;
 }
@@ -391,7 +399,7 @@ function inserirLinha_(p) {
   var sheet = pegarAba_(p.sheet);
   var cols  = mapearColunas_(sheet);
 
-  var existente = localizarLinha_(sheet, cols, nome, 0);
+  var existente = localizarLinha_(sheet, cols, nome, 0, true);
   if (existente) {
     var r = lancarCusto_({
       sheet: sheet.getName(), nome: nome, value: valor,
