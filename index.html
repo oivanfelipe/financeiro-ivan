@@ -481,7 +481,7 @@
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
    Orçamento Ivan v2 — Single-file SPA
-   Backend: Supabase (PostgreSQL)  |  AI: Groq (LLaMA 3.3) function calling
+   Backend: Supabase (PostgreSQL)  |  AI: OpenAI GPT-4o function calling
    ═══════════════════════════════════════════════════════════════════════ */
 
 // === CONSTANTS ===
@@ -508,7 +508,7 @@ let cashflow        = null; // fin_monthly_cashflow result
 let categoryBudgets = [];   // fin_category_budgets
 
 // Chat
-let openaiKey       = localStorage.getItem('oiv2_groq_key') || '';
+let openaiKey       = localStorage.getItem('oiv2_openai_key') || '';
 let chatHistory     = [];
 let chatTyping      = false;
 let ultimaAcaoParams = null;
@@ -819,7 +819,7 @@ async function executeTool(name, args) {
 }
 
 async function sendChat(userMsg) {
-  if (!openaiKey) { showToast('Configure a chave Groq primeiro', 'error'); return; }
+  if (!openaiKey) { showToast('Configure a chave OpenAI primeiro', 'error'); return; }
   if (chatTyping) return;
 
   chatHistory.push({ role: 'user', content: userMsg });
@@ -832,10 +832,10 @@ async function sendChat(userMsg) {
 
     // Agentic loop — up to 5 turns to resolve tool calls
     for (let i = 0; i < 5; i++) {
-      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, tools: FINANCE_TOOLS, tool_choice: 'auto' })
+        body: JSON.stringify({ model: 'gpt-4o', messages, tools: FINANCE_TOOLS, tool_choice: 'auto' })
       });
       if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `HTTP ${resp.status}`); }
       const data = await resp.json();
@@ -1003,8 +1003,8 @@ function renderChat() {
   if (!openaiKey) {
     el.innerHTML = `
       <div class="chat-key-setup">
-        <p>Configure sua chave da Groq para usar o assistente financeiro.</p>
-        <input class="input-key" type="password" id="openai-key-input" placeholder="gsk_..." />
+        <p>Configure sua chave da OpenAI para usar o assistente financeiro.</p>
+        <input class="input-key" type="password" id="openai-key-input" placeholder="sk-..." />
         <button class="btn-primary" onclick="salvarChaveOpenAI()">Salvar e começar</button>
       </div>
       ${renderChatHTML()}`;
@@ -1047,9 +1047,9 @@ function renderChatMessages(typing = false) {
 
 function salvarChaveOpenAI() {
   const k = document.getElementById('openai-key-input')?.value?.trim();
-  if (!k || !k.startsWith('gsk_')) { showToast('Chave inválida — deve começar com gsk_', 'error'); return; }
+  if (!k || !k.startsWith('sk-')) { showToast('Chave inválida — deve começar com sk-', 'error'); return; }
   openaiKey = k;
-  localStorage.setItem('oiv2_groq_key', k);
+  localStorage.setItem('oiv2_openai_key', k);
   renderChat();
   showToast('Chave salva ✓', 'success');
 }
