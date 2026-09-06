@@ -1113,6 +1113,29 @@ function abrirModalNovaConta() {
       </div>
     </div>
     <input type="hidden" id="nc-recurrence" value="automatico" />
+    <div id="nc-repeat-section" style="margin-bottom:12px">
+      <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Repetição</div>
+      <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
+          <input type="radio" name="nc-rep" value="unico" checked onchange="onRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+          Só este mês
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="nc-rep" value="repetir" onchange="onRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+          Repetir por
+          <input type="number" id="nc-meses" min="2" max="60" value="12" disabled
+            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+          meses
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="nc-rep" value="parcelar" onchange="onRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+          Em
+          <input type="number" id="nc-parcelas" min="2" max="60" value="12" disabled
+            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+          parcelas
+        </label>
+      </div>
+    </div>
     <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
         <input type="checkbox" id="nc-auto-toggle" onchange="toggleAutoCard()" style="width:18px;height:18px;accent-color:#6366f1" />
@@ -1141,6 +1164,18 @@ function selecionarRec(prefix, tipo) {
   });
   const hidden = document.getElementById(`${prefix}-recurrence`);
   if (hidden) hidden.value = tipo;
+  if (prefix === 'nc') {
+    const rep = document.getElementById('nc-repeat-section');
+    if (rep) rep.style.display = tipo === 'pontual' ? 'none' : 'block';
+  }
+}
+
+function onRepChange() {
+  const v = document.querySelector('input[name="nc-rep"]:checked')?.value;
+  const meses = document.getElementById('nc-meses');
+  const parcelas = document.getElementById('nc-parcelas');
+  if (meses) meses.disabled = v !== 'repetir';
+  if (parcelas) parcelas.disabled = v !== 'parcelar';
 }
 
 function toggleAutoCard() {
@@ -1150,22 +1185,47 @@ function toggleAutoCard() {
 }
 
 async function salvarNovaConta() {
-  const nome          = document.getElementById('nc-nome').value.trim();
-  const catId         = document.getElementById('nc-cat').value || null;
-  const valor         = parseFloat(document.getElementById('nc-valor').value);
-  const dia           = parseInt(document.getElementById('nc-dia').value) || null;
+  const nome           = document.getElementById('nc-nome').value.trim();
+  const catId          = document.getElementById('nc-cat').value || null;
+  const valor          = parseFloat(document.getElementById('nc-valor').value);
+  const dia            = parseInt(document.getElementById('nc-dia').value) || null;
   const recurrenceType = document.getElementById('nc-recurrence')?.value || 'manual';
-  const autoOn        = document.getElementById('nc-auto-toggle')?.checked;
-  const defPmId       = autoOn ? (document.getElementById('nc-card')?.value || null) : null;
-  // tipo legacy: automático/pontual → fixo/pontual, manual → fixo
+  const autoOn         = document.getElementById('nc-auto-toggle')?.checked;
+  const defPmId        = autoOn ? (document.getElementById('nc-card')?.value || null) : null;
+  const repMode        = document.querySelector('input[name="nc-rep"]:checked')?.value || 'unico';
+  const nMeses         = Math.max(2, parseInt(document.getElementById('nc-meses')?.value) || 12);
+  const nParcelas      = Math.max(2, parseInt(document.getElementById('nc-parcelas')?.value) || 12);
   const tipo = recurrenceType === 'pontual' ? 'pontual' : 'fixo';
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
+
+  function addMeses(m, a, n) {
+    const total = (a * 12 + m - 1) + n;
+    return { month: (total % 12) + 1, year: Math.floor(total / 12) };
+  }
+
+  const btn = document.querySelector('#modal-content .btn-save');
+  if (btn) btn.disabled = true;
   try {
-    await insertCommitment({ month:mesAtual, year:anoAtual, name:nome, category_id:catId, type:tipo, planned_amount:valor, due_day:dia, default_payment_method_id: defPmId, recurrence_type: recurrenceType });
-    fecharModal();
-    await loadMes();
-    showToast('Despesa salva ✓','success');
-  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
+    if (repMode === 'parcelar' && nParcelas >= 2) {
+      for (let i = 0; i < nParcelas; i++) {
+        const { month, year } = addMeses(mesAtual, anoAtual, i);
+        await insertCommitment({ month, year, name: `${nome} (${i+1}/${nParcelas})`, category_id: catId, type: 'pontual', planned_amount: valor, due_day: dia, default_payment_method_id: defPmId, recurrence_type: 'pontual' });
+      }
+      fecharModal(); await loadMes(); showToast(`${nParcelas} parcelas criadas ✓`, 'success');
+    } else if (repMode === 'repetir' && nMeses >= 2) {
+      for (let i = 0; i < nMeses; i++) {
+        const { month, year } = addMeses(mesAtual, anoAtual, i);
+        await insertCommitment({ month, year, name: nome, category_id: catId, type: tipo, planned_amount: valor, due_day: dia, default_payment_method_id: defPmId, recurrence_type: recurrenceType });
+      }
+      fecharModal(); await loadMes(); showToast(`Despesa adicionada por ${nMeses} meses ✓`, 'success');
+    } else {
+      await insertCommitment({ month: mesAtual, year: anoAtual, name: nome, category_id: catId, type: tipo, planned_amount: valor, due_day: dia, default_payment_method_id: defPmId, recurrence_type: recurrenceType });
+      fecharModal(); await loadMes(); showToast('Despesa salva ✓', 'success');
+    }
+  } catch(e) {
+    if (btn) btn.disabled = false;
+    showToast('Erro: '+(e.message||JSON.stringify(e)),'error');
+  }
 }
 
 // === PAGAR ===
