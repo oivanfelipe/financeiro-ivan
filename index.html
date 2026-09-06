@@ -189,6 +189,41 @@
     .badge-semana  { background: #1a1a00; color: #fcd34d; }
     .badge-futuro  { background: #111; color: #555; }
     .badge-fatura  { background: #1a0a2a; color: #c084fc; }
+    .badge-auto    { background: #1a0a2a; color: #c084fc; }
+    .badge-manual  { background: #2a1a00; color: #fbbf24; }
+
+    /* Toggle de recorrência */
+    .rec-toggle { display: flex; gap: 7px; margin-bottom: 14px; }
+    .rec-opt {
+      flex: 1; padding: 10px 6px; background: #1a1a1a; border: 2px solid #2a2a2a;
+      border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.15s;
+    }
+    .rec-opt-icon { font-size: 18px; display: block; margin-bottom: 3px; }
+    .rec-opt-label { font-size: 11px; font-weight: 600; color: #666; display: block; }
+    .rec-opt-hint { font-size: 9px; color: #444; display: block; margin-top: 2px; }
+    .rec-opt.sel-auto  { border-color: #c084fc; background: #1a0a2a; }
+    .rec-opt.sel-auto .rec-opt-label  { color: #c084fc; }
+    .rec-opt.sel-manual { border-color: #fbbf24; background: #2a1a00; }
+    .rec-opt.sel-manual .rec-opt-label { color: #fbbf24; }
+    .rec-opt.sel-pontual { border-color: #6366f1; background: #0d0d1a; }
+    .rec-opt.sel-pontual .rec-opt-label { color: #818cf8; }
+
+    /* Planejamento */
+    .plan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .plan-title  { font-size: 16px; font-weight: 700; color: #fff; }
+    .plan-total  { font-size: 13px; color: #f87171; font-weight: 600; }
+    .plan-card {
+      background: #141414; border: 1px solid #1e1e1e; border-radius: 12px;
+      padding: 13px 14px; margin-bottom: 7px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .plan-emoji { font-size: 20px; flex-shrink: 0; }
+    .plan-info  { flex: 1; min-width: 0; }
+    .plan-name  { font-size: 14px; font-weight: 600; color: #e0e0e0; }
+    .plan-meta  { font-size: 11px; color: #555; margin-top: 2px; }
+    .plan-right { text-align: right; flex-shrink: 0; }
+    .plan-val   { font-size: 14px; font-weight: 700; color: #f0f0f0; }
+    .plan-day   { font-size: 11px; color: #444; margin-top: 2px; }
 
     .conta-prog { margin-top: 10px; }
     .conta-prog .progress-bar { height: 5px; }
@@ -393,11 +428,11 @@
   <div id="tab-dashboard" class="tab-content active">
     <div id="dash-root"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
   </div>
-  <div id="tab-contas" class="tab-content">
-    <div id="contas-root"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+  <div id="tab-planejamento" class="tab-content">
+    <div id="planejamento-root"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
   </div>
-  <div id="tab-faturas" class="tab-content">
-    <div id="faturas-root"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+  <div id="tab-pagar" class="tab-content">
+    <div id="pagar-root"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
   </div>
   <div id="tab-gastos" class="tab-content">
     <div id="gastos-root"></div>
@@ -411,11 +446,11 @@
   <button class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
     <span class="nav-icon">📊</span><span>Dashboard</span>
   </button>
-  <button class="nav-item" data-tab="contas" onclick="switchTab('contas')">
-    <span class="nav-icon">📋</span><span>Contas</span>
+  <button class="nav-item" data-tab="planejamento" onclick="switchTab('planejamento')">
+    <span class="nav-icon">📋</span><span>Planej.</span>
   </button>
-  <button class="nav-item" data-tab="faturas" onclick="switchTab('faturas')">
-    <span class="nav-icon">💳</span><span>Faturas</span>
+  <button class="nav-item" data-tab="pagar" onclick="switchTab('pagar')">
+    <span class="nav-icon">💳</span><span>Pagar</span>
   </button>
   <button class="nav-item" data-tab="gastos" onclick="switchTab('gastos')">
     <span class="nav-icon">💸</span><span>Gastos</span>
@@ -527,7 +562,7 @@ async function loadAll() {
 
 async function loadMes() {
   document.getElementById('mes-label').textContent = mesLabel(mesAtual, anoAtual);
-  dirtyTabs = new Set(['dashboard','contas','faturas','gastos']);
+  dirtyTabs = new Set(['dashboard','planejamento','pagar','gastos']);
 
   const [cmts, spend, spSum] = await Promise.all([
     sb.from('fin_commitment_summary').select('*').eq('month', mesAtual).eq('year', anoAtual).order('due_day'),
@@ -540,10 +575,14 @@ async function loadMes() {
   spendingSummary = spSum.data || [];
 
   const { data: rawCmts } = await sb.from('fin_commitments')
-    .select('id, default_payment_method_id')
+    .select('id, default_payment_method_id, recurrence_type')
     .eq('month', mesAtual).eq('year', anoAtual);
-  const pmMap = Object.fromEntries((rawCmts||[]).map(r => [r.id, r.default_payment_method_id]));
-  commitments.forEach(c => { c.default_payment_method_id = pmMap[c.id] || null; });
+  const pmMap  = Object.fromEntries((rawCmts||[]).map(r => [r.id, r.default_payment_method_id]));
+  const recMap = Object.fromEntries((rawCmts||[]).map(r => [r.id, r.recurrence_type]));
+  commitments.forEach(c => {
+    c.default_payment_method_id = pmMap[c.id] || null;
+    c.recurrence_type = recMap[c.id] || 'manual';
+  });
 
   const { data: cf } = await sb.rpc('fin_monthly_cashflow', { p_month: mesAtual, p_year: anoAtual });
   cashflow = (cf && cf[0]) || null;
@@ -665,32 +704,58 @@ function renderDashboard() {
   `;
 }
 
-// === CONTAS ===
-function renderContas() {
-  const el = document.getElementById('contas-root');
-  const totalFaltante = commitments.reduce((s,c) => s + Math.max(Number(c.remaining),0), 0);
-  const qtdQuitadas   = commitments.filter(c => Number(c.remaining) <= 0.005).length;
+// === PLANEJAMENTO ===
+function renderPlanejamento() {
+  const el = document.getElementById('planejamento-root');
+  const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
 
-  const sorted = [...commitments].sort((a,b) => prioridadeConta(a)-prioridadeConta(b) || (a.due_day||99)-(b.due_day||99));
-  const PRIO_LABEL = ['🔴 Vencidas','🔴 Vencidas (parcial)','🟡 Hoje','⚡ Esta semana','📅 Próximas','✅ Pagas','🔵 Futuras'];
-  let lastPrio = -1;
-  const cmtHtml = sorted.map(c => {
-    const p = prioridadeConta(c);
-    let div = '';
-    if (p !== lastPrio) { lastPrio = p; div = `<div class="secao-divider">${PRIO_LABEL[Math.min(p, PRIO_LABEL.length-1)]}</div>`; }
-    return div + buildContaCard(c);
-  }).join('');
+  const automaticas = commitments.filter(c => c.recurrence_type === 'automatico').sort((a,b) => (a.due_day||99)-(b.due_day||99));
+  const manuais     = commitments.filter(c => c.recurrence_type === 'manual').sort((a,b) => (a.due_day||99)-(b.due_day||99));
+  const pontuais    = commitments.filter(c => c.recurrence_type === 'pontual').sort((a,b) => (a.due_day||99)-(b.due_day||99));
+
+  function buildPlanCard(c) {
+    const cat   = categories.find(x => x.id === c.category_id);
+    const emoji = cat?.emoji || '📌';
+    const badge = c.recurrence_type === 'automatico'
+      ? `<span class="badge badge-auto">🤖 Automático</span>`
+      : c.recurrence_type === 'pontual'
+        ? `<span class="badge badge-futuro">📅 Pontual</span>`
+        : `<span class="badge badge-manual">🔔 Manual</span>`;
+    const dayLabel = c.due_day ? `Dia ${c.due_day}` : 'Sem vencimento';
+    return `
+      <div class="plan-card">
+        <div class="plan-emoji">${esc(emoji)}</div>
+        <div class="plan-info">
+          <div class="plan-name">${esc(c.name)}</div>
+          <div class="plan-meta">${esc(c.category_name||'')}${c.category_name?' · ':''}${dayLabel}</div>
+          ${badge}
+        </div>
+        <div class="plan-right">
+          <div class="plan-val">R$ ${fmt(c.planned_amount)}</div>
+          <button class="menu-btn" style="position:static;margin-left:4px" onclick="abrirEditarCommitment('${esc(c.id)}')">✏️</button>
+        </div>
+      </div>`;
+  }
+
+  const autoHtml    = automaticas.map(buildPlanCard).join('');
+  const manualHtml  = manuais.map(buildPlanCard).join('');
+  const pontualHtml = pontuais.map(buildPlanCard).join('');
 
   el.innerHTML = `
-    <div class="contas-top-row">
-      <div class="contas-top-title">Contas do mês</div>
-      <button class="btn-nova" onclick="abrirModalNovaConta()">+ Nova conta</button>
+    <div class="plan-header">
+      <div class="plan-title">Planejamento</div>
+      <button class="btn-nova" onclick="abrirModalNovaConta()">+ Nova</button>
     </div>
     <div class="contas-summary">
-      <div class="cs-card"><div class="cs-label">A pagar</div><div class="cs-val red">R$ ${fmt(totalFaltante)}</div></div>
-      <div class="cs-card"><div class="cs-label">Quitadas</div><div class="cs-val green">${qtdQuitadas} / ${commitments.length}</div></div>
+      <div class="cs-card"><div class="cs-label">Comprometido</div><div class="cs-val red">R$ ${fmt(totalComprometido)}</div></div>
+      <div class="cs-card"><div class="cs-label">Itens</div><div class="cs-val green">${commitments.length}</div></div>
     </div>
-    ${cmtHtml || '<div class="empty-state"><div class="icon">✅</div>Nenhuma conta cadastrada<br><small style="margin-top:8px;display:block">Toque em + Nova conta</small></div>'}
+
+    ${automaticas.length ? `<div class="secao-divider">🤖 Automáticos — cobram sozinhos</div>${autoHtml}` : ''}
+    ${manuais.length     ? `<div class="secao-divider">🔔 Manuais — precisa pagar</div>${manualHtml}` : ''}
+    ${pontuais.length    ? `<div class="secao-divider">📅 Pontuais — só este mês</div>${pontualHtml}` : ''}
+
+    ${!commitments.length ? '<div class="empty-state"><div class="icon">📋</div>Nenhuma despesa cadastrada<br><small style="margin-top:8px;display:block">Toque em + Nova para começar</small></div>' : ''}
   `;
 }
 
@@ -824,9 +889,9 @@ async function confirmarPagamento(id) {
   const prevPaid  = Number(c.paid);
   c.paid          = prevPaid + val;
   c.remaining     = Number(c.planned_amount) - c.paid;
-  renderContas();
+  renderPagar();
   dirtyTabs.add('dashboard');
-  dirtyTabs.add('faturas');
+  dirtyTabs.add('pagar');
 
   try {
     await insertPayment(id, val, pmId, null, null);
@@ -839,7 +904,7 @@ async function confirmarPagamento(id) {
   } catch(e) {
     c.paid      = prevPaid;
     c.remaining = Number(c.planned_amount) - prevPaid;
-    renderContas();
+    renderPagar();
     showToast('Erro ao registrar pagamento','error');
   }
 }
@@ -855,9 +920,10 @@ function abrirEditarCommitment(id) {
     `<option value="${esc(p.id)}" ${p.id===c.default_payment_method_id?'selected':''}>${esc(p.name)}</option>`
   ).join('');
   const autoOn = !!c.default_payment_method_id;
+  const recType = c.recurrence_type || 'manual';
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
-    <div class="modal-title">Editar conta</div>
+    <div class="modal-title">Editar despesa</div>
     <input type="hidden" id="edit-id" value="${esc(c.id)}" />
     <div class="field"><label>Nome</label><input type="text" id="edit-nome" value="${esc(c.name)}" /></div>
     <div class="field"><label>Categoria</label>
@@ -867,14 +933,19 @@ function abrirEditarCommitment(id) {
       <div class="field"><label>Valor (R$)</label><input type="number" id="edit-valor" value="${Number(c.planned_amount).toFixed(2)}" step="0.01" /></div>
       <div class="field"><label>Dia vencimento</label><input type="number" id="edit-dia" value="${c.due_day||''}" min="1" max="31" /></div>
     </div>
-    <div class="field"><label>Tipo</label>
-      <select id="edit-tipo">
-        <option value="fixo" ${c.type==='fixo'?'selected':''}>Fixo</option>
-        <option value="pontual" ${c.type==='pontual'?'selected':''}>Pontual</option>
-        <option value="parcelado" ${c.type==='parcelado'?'selected':''}>Parcelado</option>
-        <option value="fatura" ${c.type==='fatura'?'selected':''}>Fatura</option>
-      </select>
+    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
+    <div class="rec-toggle">
+      <div class="rec-opt ${recType==='automatico'?'sel-auto':''}" id="edit-rec-auto" onclick="selecionarRec('edit','automatico')">
+        <span class="rec-opt-icon">🤖</span><span class="rec-opt-label">Automático</span><span class="rec-opt-hint">débita sozinho</span>
+      </div>
+      <div class="rec-opt ${recType==='manual'?'sel-manual':''}" id="edit-rec-manual" onclick="selecionarRec('edit','manual')">
+        <span class="rec-opt-icon">🔔</span><span class="rec-opt-label">Manual</span><span class="rec-opt-hint">preciso pagar</span>
+      </div>
+      <div class="rec-opt ${recType==='pontual'?'sel-pontual':''}" id="edit-rec-pontual" onclick="selecionarRec('edit','pontual')">
+        <span class="rec-opt-icon">📅</span><span class="rec-opt-label">Pontual</span><span class="rec-opt-hint">só este mês</span>
+      </div>
     </div>
+    <input type="hidden" id="edit-recurrence" value="${esc(recType)}" />
     <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
         <input type="checkbox" id="edit-auto-toggle" onchange="toggleAutoCardEdit()" ${autoOn?'checked':''} style="width:18px;height:18px;accent-color:#6366f1" />
@@ -901,22 +972,23 @@ function toggleAutoCardEdit() {
 }
 
 async function salvarEdicao() {
-  const id      = document.getElementById('edit-id').value;
-  const nome    = document.getElementById('edit-nome').value.trim();
-  const catId   = document.getElementById('edit-cat').value || null;
-  const valor   = parseFloat(document.getElementById('edit-valor').value);
-  const dia     = parseInt(document.getElementById('edit-dia').value) || null;
-  const tipo    = document.getElementById('edit-tipo').value;
-  const autoOn  = document.getElementById('edit-auto-toggle')?.checked;
-  const defPmId = autoOn ? (document.getElementById('edit-card')?.value || null) : null;
+  const id             = document.getElementById('edit-id').value;
+  const nome           = document.getElementById('edit-nome').value.trim();
+  const catId          = document.getElementById('edit-cat').value || null;
+  const valor          = parseFloat(document.getElementById('edit-valor').value);
+  const dia            = parseInt(document.getElementById('edit-dia').value) || null;
+  const recurrenceType = document.getElementById('edit-recurrence')?.value || 'manual';
+  const autoOn         = document.getElementById('edit-auto-toggle')?.checked;
+  const defPmId        = autoOn ? (document.getElementById('edit-card')?.value || null) : null;
+  const tipo           = recurrenceType === 'pontual' ? 'pontual' : 'fixo';
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
 
   try {
-    const { error } = await sb.from('fin_commitments').update({ name:nome, category_id:catId, planned_amount:valor, due_day:dia, type:tipo, default_payment_method_id: defPmId }).eq('id', id);
+    const { error } = await sb.from('fin_commitments').update({ name:nome, category_id:catId, planned_amount:valor, due_day:dia, type:tipo, recurrence_type:recurrenceType, default_payment_method_id: defPmId }).eq('id', id);
     if (error) throw error;
     fecharModal();
     await loadMes();
-    showToast('Conta atualizada ✓','success');
+    showToast('Despesa atualizada ✓','success');
   } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
 }
 
@@ -934,22 +1006,34 @@ function abrirModalNovaConta() {
   const cardOpts   = creditCards.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
-    <div class="modal-title">Nova conta</div>
+    <div class="modal-title">Nova despesa</div>
     <div class="field"><label>Nome</label><input type="text" id="nc-nome" placeholder="Ex: Aluguel, Netflix..." /></div>
     <div class="field"><label>Categoria</label>
       <select id="nc-cat"><option value="">— sem categoria —</option>${catOpts}</select>
-    </div>
-    <div class="field"><label>Tipo</label>
-      <select id="nc-tipo">
-        <option value="fixo">Fixo (mensal)</option>
-        <option value="parcelado">Parcelado</option>
-        <option value="pontual">Pontual (só este mês)</option>
-      </select>
     </div>
     <div class="field-row">
       <div class="field"><label>Valor (R$)</label><input type="number" id="nc-valor" step="0.01" placeholder="0,00" /></div>
       <div class="field"><label>Dia vencimento</label><input type="number" id="nc-dia" min="1" max="31" placeholder="Ex: 10" /></div>
     </div>
+    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
+    <div class="rec-toggle">
+      <div class="rec-opt sel-auto" id="nc-rec-auto" onclick="selecionarRec('nc','automatico')">
+        <span class="rec-opt-icon">🤖</span>
+        <span class="rec-opt-label">Automático</span>
+        <span class="rec-opt-hint">débita sozinho</span>
+      </div>
+      <div class="rec-opt" id="nc-rec-manual" onclick="selecionarRec('nc','manual')">
+        <span class="rec-opt-icon">🔔</span>
+        <span class="rec-opt-label">Manual</span>
+        <span class="rec-opt-hint">preciso pagar</span>
+      </div>
+      <div class="rec-opt" id="nc-rec-pontual" onclick="selecionarRec('nc','pontual')">
+        <span class="rec-opt-icon">📅</span>
+        <span class="rec-opt-label">Pontual</span>
+        <span class="rec-opt-hint">só este mês</span>
+      </div>
+    </div>
+    <input type="hidden" id="nc-recurrence" value="automatico" />
     <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
         <input type="checkbox" id="nc-auto-toggle" onchange="toggleAutoCard()" style="width:18px;height:18px;accent-color:#6366f1" />
@@ -969,6 +1053,17 @@ function abrirModalNovaConta() {
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
+function selecionarRec(prefix, tipo) {
+  const opts = { automatico: 'auto', manual: 'manual', pontual: 'pontual' };
+  Object.keys(opts).forEach(t => {
+    const el = document.getElementById(`${prefix}-rec-${opts[t]}`);
+    if (!el) return;
+    el.className = 'rec-opt' + (t === tipo ? ` sel-${opts[t]}` : '');
+  });
+  const hidden = document.getElementById(`${prefix}-recurrence`);
+  if (hidden) hidden.value = tipo;
+}
+
 function toggleAutoCard() {
   const checked = document.getElementById('nc-auto-toggle')?.checked;
   const row = document.getElementById('nc-card-row');
@@ -976,58 +1071,54 @@ function toggleAutoCard() {
 }
 
 async function salvarNovaConta() {
-  const nome    = document.getElementById('nc-nome').value.trim();
-  const catId   = document.getElementById('nc-cat').value || null;
-  const tipo    = document.getElementById('nc-tipo').value;
-  const valor   = parseFloat(document.getElementById('nc-valor').value);
-  const dia     = parseInt(document.getElementById('nc-dia').value) || null;
-  const autoOn  = document.getElementById('nc-auto-toggle')?.checked;
-  const defPmId = autoOn ? (document.getElementById('nc-card')?.value || null) : null;
+  const nome          = document.getElementById('nc-nome').value.trim();
+  const catId         = document.getElementById('nc-cat').value || null;
+  const valor         = parseFloat(document.getElementById('nc-valor').value);
+  const dia           = parseInt(document.getElementById('nc-dia').value) || null;
+  const recurrenceType = document.getElementById('nc-recurrence')?.value || 'manual';
+  const autoOn        = document.getElementById('nc-auto-toggle')?.checked;
+  const defPmId       = autoOn ? (document.getElementById('nc-card')?.value || null) : null;
+  // tipo legacy: automático/pontual → fixo/pontual, manual → fixo
+  const tipo = recurrenceType === 'pontual' ? 'pontual' : 'fixo';
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
   try {
-    await insertCommitment({ month:mesAtual, year:anoAtual, name:nome, category_id:catId, type:tipo, planned_amount:valor, due_day:dia, default_payment_method_id: defPmId });
+    await insertCommitment({ month:mesAtual, year:anoAtual, name:nome, category_id:catId, type:tipo, planned_amount:valor, due_day:dia, default_payment_method_id: defPmId, recurrence_type: recurrenceType });
     fecharModal();
     await loadMes();
-    showToast('Conta salva ✓','success');
+    showToast('Despesa salva ✓','success');
   } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
 }
 
-// === FATURAS ===
-function renderFaturas() {
-  const el = document.getElementById('faturas-root');
-  const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
+// === PAGAR ===
+function renderPagar() {
+  const el = document.getElementById('pagar-root');
 
-  if (creditCards.length === 0) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">💳</div>Nenhum cartão de crédito cadastrado<br><small style="margin-top:8px;display:block">Adicione em Perfil → Meus cartões</small></div>`;
-    return;
-  }
+  // Somente contas manuais e pontuais (não automáticas)
+  const pagarCmts = commitments.filter(c => c.recurrence_type !== 'automatico');
 
-  const proxMes = mesAtual===12 ? 1  : mesAtual+1;
+  const totalFaltante = pagarCmts.reduce((s,c) => s + Math.max(Number(c.remaining),0), 0);
+  const qtdQuitadas   = pagarCmts.filter(c => Number(c.remaining) <= 0.005).length;
+
+  const sorted = [...pagarCmts].sort((a,b) => prioridadeConta(a)-prioridadeConta(b) || (a.due_day||99)-(b.due_day||99));
+  const PRIO_LABEL = ['🔴 Vencidas','🔴 Vencidas (parcial)','🟡 Hoje','⚡ Esta semana','📅 Próximas','✅ Pagas','🔵 Futuras'];
+  let lastPrio = -1;
+  const cmtHtml = sorted.map(c => {
+    const p = prioridadeConta(c);
+    let div = '';
+    if (p !== lastPrio) { lastPrio = p; div = `<div class="secao-divider">${PRIO_LABEL[Math.min(p, PRIO_LABEL.length-1)]}</div>`; }
+    return div + buildContaCard(c);
+  }).join('');
+
+  // Faturas de cartão (resumo colapsável)
+  const proxMes = mesAtual===12 ? 1 : mesAtual+1;
   const proxAno = mesAtual===12 ? anoAtual+1 : anoAtual;
-  const prevMes = mesAtual===1  ? 12 : mesAtual-1;
-
-  const html = creditCards.map(card => {
+  const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
+  const faturaHtml = creditCards.map(card => {
     const cardEntries = spendingSummary.filter(s => s.card_id===card.id);
     const total = cardEntries.reduce((s,x) => s+Number(x.total_spent), 0);
-
-    const catRows = cardEntries.sort((a,b) => Number(b.total_spent)-Number(a.total_spent)).map(s => `
-      <div class="fatura-cat-row">
-        <span class="fatura-cat-name">${esc(s.category_emoji||'•')} ${esc(s.category_name)}</span>
-        <span class="fatura-cat-val">R$ ${fmt(s.total_spent)}</span>
-      </div>`).join('');
-
-    const vencLabel = card.billing_day
-      ? `vence dia ${card.billing_day} de ${MESES[proxMes-1]}`
-      : `em ${MESES[proxMes-1]}`;
-
-    const faturaExiste = commitments.some(c =>
-      c.type==='fatura' && c.fatura_card_id===card.id && c.month===proxMes && c.year===proxAno
-    );
-
-    const fatAnt = commitments.find(c =>
-      c.type==='fatura' && c.fatura_card_id===card.id && c.fatura_reference_month===prevMes
-    );
-
+    if (!total) return '';
+    const vencLabel = card.billing_day ? `vence dia ${card.billing_day}/${MESES[proxMes-1].slice(0,3)}` : MESES[proxMes-1];
+    const faturaExiste = commitments.some(c => c.type==='fatura' && c.fatura_card_id===card.id && c.month===proxMes && c.year===proxAno);
     return `
       <div class="fatura-card">
         <div class="fatura-header">
@@ -1037,27 +1128,29 @@ function renderFaturas() {
           </div>
           <div class="fatura-total">R$ ${fmt(total)}</div>
         </div>
-        <div class="fatura-sub">Consumo de ${mesLabel(mesAtual, anoAtual)} · ${vencLabel}</div>
-        ${catRows ? `<div>${catRows}</div>` : '<div style="font-size:13px;color:#444;margin:8px 0">Sem gastos registrados</div>'}
-        ${total>0&&!faturaExiste
-          ? `<button class="btn-gen-fatura" onclick="gerarFatura('${esc(card.id)}',${total},${proxMes},${proxAno})">
-              + Gerar fatura de ${MESES[proxMes-1]} (R$ ${fmt(total)})
-             </button>`
-          : faturaExiste
-            ? `<div style="font-size:12px;color:#555;text-align:center;margin-top:10px">✓ Fatura de ${MESES[proxMes-1]} já gerada</div>`
-            : ''}
-        ${fatAnt ? `
-          <div style="margin-top:14px;padding-top:14px;border-top:1px solid #1e1e1e">
-            <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Fatura anterior (${MESES[prevMes-1]})</div>
-            <div style="display:flex;justify-content:space-between;font-size:14px">
-              <span style="color:#888">R$ ${fmt(fatAnt.planned_amount)}</span>
-              <span style="color:${Number(fatAnt.remaining)<=0.005?'#4ade80':'#f87171'}">${Number(fatAnt.remaining)<=0.005?'✓ Paga':'Falta: R$ '+fmt(fatAnt.remaining)}</span>
-            </div>
-          </div>` : ''}
+        <div class="fatura-sub">Consumo de ${mesLabel(mesAtual,anoAtual)} · ${vencLabel}</div>
+        ${cardEntries.sort((a,b)=>Number(b.total_spent)-Number(a.total_spent)).map(s=>`
+          <div class="fatura-cat-row">
+            <span class="fatura-cat-name">${esc(s.category_emoji||'•')} ${esc(s.category_name)}</span>
+            <span class="fatura-cat-val">R$ ${fmt(s.total_spent)}</span>
+          </div>`).join('')}
+        ${!faturaExiste && total > 0
+          ? `<button class="btn-gen-fatura" onclick="gerarFatura('${esc(card.id)}',${total},${proxMes},${proxAno})">+ Gerar fatura de ${MESES[proxMes-1]} (R$ ${fmt(total)})</button>`
+          : `<div style="font-size:12px;color:#555;text-align:center;margin-top:10px">✓ Fatura de ${MESES[proxMes-1]} já gerada</div>`}
       </div>`;
-  }).join('');
+  }).filter(Boolean).join('');
 
-  el.innerHTML = html || '<div class="empty-state">Nenhum dado</div>';
+  el.innerHTML = `
+    <div class="contas-top-row">
+      <div class="contas-top-title">Pagamentos</div>
+    </div>
+    <div class="contas-summary">
+      <div class="cs-card"><div class="cs-label">A pagar</div><div class="cs-val red">R$ ${fmt(totalFaltante)}</div></div>
+      <div class="cs-card"><div class="cs-label">Pagas</div><div class="cs-val green">${qtdQuitadas} / ${pagarCmts.length}</div></div>
+    </div>
+    ${cmtHtml || '<div class="empty-state"><div class="icon">✅</div>Nenhuma conta para pagar<br><small style="margin-top:8px;display:block">Adicione despesas manuais no Planejamento</small></div>'}
+    ${faturaHtml ? `<div class="sec-title" style="margin-top:24px">💳 Faturas de cartão</div>${faturaHtml}` : ''}
+  `;
 }
 
 async function gerarFatura(cardId, total, proxMes, proxAno) {
@@ -1156,7 +1249,7 @@ async function addGasto() {
   }).select().single();
   if (error) { showToast('Erro: '+error.message,'error'); return; }
   spendingEntries.unshift(row);
-  dirtyTabs.add('dashboard'); dirtyTabs.add('faturas');
+  dirtyTabs.add('dashboard'); dirtyTabs.add('pagar');
   renderGastos();
   document.getElementById('g-valor').value = '';
   document.getElementById('g-desc').value  = '';
@@ -1168,7 +1261,7 @@ async function deletarGasto(id) {
   const { error } = await sb.from('fin_spending_entries').delete().eq('id', id);
   if (error) { showToast('Erro ao remover','error'); return; }
   spendingEntries = spendingEntries.filter(e => e.id!==id);
-  dirtyTabs.add('dashboard'); dirtyTabs.add('faturas');
+  dirtyTabs.add('dashboard'); dirtyTabs.add('pagar');
   renderGastos();
   showToast('Lançamento removido','success');
 }
@@ -1377,11 +1470,11 @@ function switchTab(tab) {
 }
 
 function renderAtivo() {
-  if (abaAtiva==='dashboard') renderDashboard();
-  if (abaAtiva==='contas')    renderContas();
-  if (abaAtiva==='faturas')   renderFaturas();
-  if (abaAtiva==='gastos')    renderGastos();
-  if (abaAtiva==='perfil')    renderPerfil();
+  if (abaAtiva==='dashboard')    renderDashboard();
+  if (abaAtiva==='planejamento') renderPlanejamento();
+  if (abaAtiva==='pagar')        renderPagar();
+  if (abaAtiva==='gastos')       renderGastos();
+  if (abaAtiva==='perfil')       renderPerfil();
 }
 
 function navMes(delta) {
