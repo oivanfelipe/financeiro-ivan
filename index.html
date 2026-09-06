@@ -297,6 +297,17 @@
     }
     .btn-pay-open:hover { border-color: #444; color: #aaa; }
     .pay-total-preview { font-size: 11px; color: #555; margin-top: 6px; }
+    .conta-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .btn-edit-conta {
+      background: none; border: 1px solid #2a2a2a; color: #666;
+      border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-edit-conta:hover { border-color: #6366f1; color: #6366f1; }
+    .btn-del-conta {
+      background: none; border: 1px solid #2a2a2a; color: #666;
+      border-radius: 8px; padding: 5px 8px; font-size: 13px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-del-conta:hover { border-color: #ef4444; color: #ef4444; }
 
     /* ── Faturas ── */
     .fatura-card {
@@ -508,7 +519,7 @@ let cashflow        = null; // fin_monthly_cashflow result
 let categoryBudgets = [];   // fin_category_budgets
 
 // Chat
-let openaiKey       = localStorage.getItem('oiv2_openai_key') || '';
+let groqKey       = localStorage.getItem('oiv2_groq_key') || '';
 let chatHistory     = [];
 let chatTyping      = false;
 let ultimaAcaoParams = null;
@@ -819,7 +830,7 @@ async function executeTool(name, args) {
 }
 
 async function sendChat(userMsg) {
-  if (!openaiKey) { showToast('Configure a chave OpenAI primeiro', 'error'); return; }
+  if (!groqKey) { showToast('Configure a chave Groq primeiro', 'error'); return; }
   if (chatTyping) return;
 
   chatHistory.push({ role: 'user', content: userMsg });
@@ -832,10 +843,10 @@ async function sendChat(userMsg) {
 
     // Agentic loop — up to 5 turns to resolve tool calls
     for (let i = 0; i < 5; i++) {
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gpt-4o', messages, tools: FINANCE_TOOLS, tool_choice: 'auto' })
+        headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, tools: FINANCE_TOOLS, tool_choice: 'auto' })
       });
       if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || `HTTP ${resp.status}`); }
       const data = await resp.json();
@@ -1000,12 +1011,12 @@ function renderDashboard() {
 // === RENDER: CHAT ===
 function renderChat() {
   const el = document.getElementById('chat-root');
-  if (!openaiKey) {
+  if (!groqKey) {
     el.innerHTML = `
       <div class="chat-key-setup">
-        <p>Configure sua chave da OpenAI para usar o assistente financeiro.</p>
-        <input class="input-key" type="password" id="openai-key-input" placeholder="sk-..." />
-        <button class="btn-primary" onclick="salvarChaveOpenAI()">Salvar e começar</button>
+        <p>Configure sua chave da Groq para usar o assistente financeiro.</p>
+        <input class="input-key" type="password" id="groq-key-input" placeholder="gsk_..." />
+        <button class="btn-primary" onclick="salvarChaveGroq()">Salvar e começar</button>
       </div>
       ${renderChatHTML()}`;
   } else {
@@ -1045,11 +1056,11 @@ function renderChatMessages(typing = false) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-function salvarChaveOpenAI() {
-  const k = document.getElementById('openai-key-input')?.value?.trim();
-  if (!k || !k.startsWith('sk-')) { showToast('Chave inválida — deve começar com sk-', 'error'); return; }
-  openaiKey = k;
-  localStorage.setItem('oiv2_openai_key', k);
+function salvarChaveGroq() {
+  const k = document.getElementById('groq-key-input')?.value?.trim();
+  if (!k || !k.startsWith('gsk_')) { showToast('Chave inválida — deve começar com gsk_', 'error'); return; }
+  groqKey = k;
+  localStorage.setItem('oiv2_groq_key', k);
   renderChat();
   showToast('Chave salva ✓', 'success');
 }
@@ -1160,10 +1171,15 @@ function buildContaCard(c) {
         </div>
       </div>
       ${pct > 0 ? `<div class="conta-prog"><div class="progress-bar"><div class="progress-fill ${barClass}" style="width:${pct}%"></div></div></div>` : ''}
-      ${status !== 'pago' ? `
+      <div class="conta-actions">
+        ${status !== 'pago' ? `
         <button class="btn-pay-open" onclick="abrirPayForm('${esc(c.id)}', ${rem > 0.005 ? fmt(rem).replace(/\./g,'').replace(',','.') : plan})">
           ${paid > 0 ? '+ Adicionar pagamento' : 'Registrar pagamento'}
-        </button>
+        </button>` : ''}
+        <button class="btn-edit-conta" onclick="abrirEditarCommitment('${esc(c.id)}')">✏️ Editar</button>
+        <button class="btn-del-conta" onclick="deletarCommitment('${esc(c.id)}', '${esc(c.name)}')">🗑️</button>
+      </div>
+      ${status !== 'pago' ? `
         <div class="pay-form" id="pay-form-${esc(c.id)}">
           <div class="pay-row">
             <input class="pay-input" type="number" step="0.01" min="0"
@@ -1216,6 +1232,47 @@ async function confirmarPagamento(id) {
     renderContas();
     showToast('Erro ao registrar pagamento', 'error');
   }
+}
+
+// === EDITAR / DELETAR COMPROMISSO ===
+function abrirEditarCommitment(id) {
+  const c = commitments.find(x => x.id === id);
+  if (!c) return;
+  const modal = document.getElementById('edit-modal');
+  document.getElementById('edit-modal-id').value    = id;
+  document.getElementById('edit-modal-nome').value  = c.name;
+  document.getElementById('edit-modal-valor').value = Number(c.planned_amount).toFixed(2);
+  document.getElementById('edit-modal-dia').value   = c.due_day || '';
+  document.getElementById('edit-modal-tipo').value  = c.type || 'pontual';
+  modal.style.display = 'flex';
+}
+
+function fecharEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+async function salvarEdicaoCommitment() {
+  const id    = document.getElementById('edit-modal-id').value;
+  const nome  = document.getElementById('edit-modal-nome').value.trim();
+  const valor = parseFloat(document.getElementById('edit-modal-valor').value);
+  const dia   = parseInt(document.getElementById('edit-modal-dia').value) || null;
+  const tipo  = document.getElementById('edit-modal-tipo').value;
+  if (!nome || !valor || valor <= 0) { showToast('Preencha nome e valor', 'error'); return; }
+
+  const { error } = await sb.from('fin_commitments').update({ name: nome, planned_amount: valor, due_day: dia, type: tipo }).eq('id', id);
+  if (error) { showToast('Erro ao salvar: ' + error.message, 'error'); return; }
+
+  fecharEditModal();
+  await loadMes();
+  showToast('Compromisso atualizado ✓', 'success');
+}
+
+async function deletarCommitment(id, nome) {
+  if (!confirm(`Deletar "${nome}"?`)) return;
+  const { error } = await sb.from('fin_commitments').delete().eq('id', id);
+  if (error) { showToast('Erro ao deletar: ' + error.message, 'error'); return; }
+  await loadMes();
+  showToast('Compromisso removido ✓', 'success');
 }
 
 // === RENDER: FATURAS ===
@@ -1632,5 +1689,40 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAll();
 });
 </script>
+
+<!-- Modal editar compromisso -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--card-bg);border-radius:16px;padding:24px;width:min(90vw,400px);display:flex;flex-direction:column;gap:14px">
+    <h3 style="margin:0;font-size:16px;font-weight:700">Editar compromisso</h3>
+    <input type="hidden" id="edit-modal-id" />
+    <div>
+      <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Nome</label>
+      <input id="edit-modal-nome" type="text" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);box-sizing:border-box" />
+    </div>
+    <div>
+      <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Valor planejado (R$)</label>
+      <input id="edit-modal-valor" type="number" step="0.01" min="0" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);box-sizing:border-box" />
+    </div>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Dia vencimento</label>
+        <input id="edit-modal-dia" type="number" min="1" max="31" placeholder="—" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);box-sizing:border-box" />
+      </div>
+      <div style="flex:1">
+        <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Tipo</label>
+        <select id="edit-modal-tipo" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);box-sizing:border-box">
+          <option value="fixo">Fixo</option>
+          <option value="pontual">Pontual</option>
+          <option value="parcelado">Parcelado</option>
+          <option value="fatura">Fatura</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button onclick="fecharEditModal()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:14px">Cancelar</button>
+      <button onclick="salvarEdicaoCommitment()" style="flex:2;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:14px;font-weight:600">Salvar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
