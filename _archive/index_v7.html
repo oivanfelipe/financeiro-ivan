@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orçamento Ivan</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px 48px;
+    }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 24px 22px 32px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* ── Cabeçalho ── */
+    .app-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    h1 { font-size: 20px; font-weight: 600; color: #fff; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 18px; }
+    .btn-refresh {
+      background: transparent; border: 1px solid #2a2a2a; color: #555;
+      border-radius: 8px; padding: 6px 11px; font-size: 13px;
+      cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+    }
+    .btn-refresh:hover { border-color: #444; color: #aaa; }
+    .btn-refresh:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Seletor de mês ── */
+    .mes-selector {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 14px; padding: 10px 14px;
+      background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
+    }
+    .mes-selector label {
+      font-size: 12px; color: #555; text-transform: uppercase;
+      letter-spacing: 0.06em; white-space: nowrap; margin: 0;
+    }
+    .mes-selector select {
+      flex: 1; background: transparent; border: none; color: #f0f0f0;
+      font-size: 14px; font-weight: 500; padding: 0; outline: none;
+      appearance: none; -webkit-appearance: none; cursor: pointer;
+    }
+    .mes-selector select option { background: #1a1a1a; color: #f0f0f0; }
+    .mes-arrow { color: #444; font-size: 10px; pointer-events: none; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex; gap: 4px; background: #111;
+      border-radius: 10px; padding: 4px; margin-bottom: 22px;
+    }
+    .tab-btn {
+      flex: 1; padding: 9px 6px; border: none; background: transparent;
+      color: #555; border-radius: 7px; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .tab-btn.active { background: #2a2a2a; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Aviso global ── */
+    .aviso {
+      background: #1a0f0f; border: 1px solid #3a1818; color: #f87171;
+      border-radius: 10px; padding: 11px 14px; font-size: 12.5px;
+      line-height: 1.45; margin-bottom: 16px;
+    }
+    .aviso.warn { background: #141008; border-color: #3a2a08; color: #fbbf24; }
+    .aviso code { background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; }
+
+    /* ── Form ── */
+    label {
+      display: block; font-size: 12px; font-weight: 500; color: #888;
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;
+    }
+    select, input[type="number"], input[type="text"] {
+      width: 100%; background: #111; border: 1px solid #2a2a2a;
+      border-radius: 10px; color: #f0f0f0; font-size: 15px;
+      padding: 12px 14px; outline: none; font-family: inherit;
+      transition: border-color 0.15s; appearance: none; -webkit-appearance: none;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px;
+    }
+    select:focus, input:focus { border-color: #3b82f6; }
+    select option { background: #1a1a1a; color: #f0f0f0; }
+    select:disabled { opacity: 0.4; cursor: not-allowed; }
+    .field { margin-bottom: 18px; }
+    .valor-wrap { position: relative; }
+    .valor-wrap > span {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%); color: #666; font-size: 15px; pointer-events: none;
+    }
+    .valor-wrap input { padding-left: 34px; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    button.btn-primary {
+      width: 100%; background: #3b82f6; color: #fff; border: none;
+      border-radius: 10px; font-size: 15px; font-weight: 600;
+      padding: 14px; cursor: pointer; transition: background 0.15s, opacity 0.15s; margin-top: 4px;
+    }
+    button.btn-primary:hover { background: #2563eb; }
+    button.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Modo somar / substituir ── */
+    .modo-toggle { display: flex; gap: 4px; background: #111; border: 1px solid #2a2a2a; border-radius: 10px; padding: 4px; }
+    .modo-btn {
+      flex: 1; padding: 9px 6px; border: none; background: transparent; color: #666;
+      border-radius: 7px; font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+    }
+    .modo-btn.active { background: #2a2a2a; color: #fff; }
+    .modo-hint { font-size: 11.5px; color: #555; margin-top: 7px; line-height: 1.45; }
+
+    /* ── Painel do item selecionado ── */
+    .item-info {
+      background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
+      padding: 12px 14px; margin-top: 10px; font-size: 12.5px; display: none;
+    }
+    .item-info.show { display: block; }
+    .info-linha { display: flex; justify-content: space-between; padding: 3px 0; }
+    .info-linha span:first-child { color: #666; }
+    .info-linha span:last-child { color: #ccc; font-weight: 500; }
+    .info-linha.destaque { border-top: 1px solid #262626; margin-top: 6px; padding-top: 8px; }
+    .info-linha.destaque span:last-child { color: #4ade80; font-weight: 700; font-size: 14px; }
+    .info-linha.destaque.estouro span:last-child { color: #f87171; }
+
+    /* ── Contas ── */
+    .contas-total { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .contas-total-label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; }
+    .contas-total-val { font-size: 22px; font-weight: 700; color: #fff; }
+    .contas-total-val span { font-size: 13px; font-weight: 400; color: #555; margin-right: 4px; }
+
+    .conta-item {
+      background: #111; border: 1px solid #2a2a2a; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px;
+    }
+    .conta-item.pago { opacity: 0.5; border-color: #1a3a1a; }
+    .conta-row { display: flex; align-items: center; gap: 12px; }
+    .conta-info { flex: 1; min-width: 0; }
+    .conta-nome { font-size: 15px; font-weight: 500; color: #f0f0f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .conta-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
+    .conta-venc { font-size: 12px; color: #555; }
+    .badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; letter-spacing: 0.04em; }
+    .badge-hoje    { background: #451a03; color: #fb923c; }
+    .badge-vence   { background: #1e1b4b; color: #818cf8; }
+    .badge-pago    { background: #14532d; color: #4ade80; }
+    .badge-vencido { background: #450a0a; color: #f87171; }
+    .badge-auto    { background: #1e293b; color: #94a3b8; }
+    .badge-parcial { background: #422006; color: #fbbf24; }
+    .conta-orc { font-size: 15px; font-weight: 600; color: #fff; white-space: nowrap; text-align: right; }
+    .conta-orc small { display: block; font-size: 10.5px; font-weight: 400; color: #555; margin-top: 2px; }
+    .btn-pagar {
+      background: #3b82f6; color: #fff; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; padding: 7px 14px; cursor: pointer;
+      white-space: nowrap; transition: background 0.15s; flex-shrink: 0;
+    }
+    .btn-pagar:hover { background: #2563eb; }
+    .btn-pago-icon { color: #4ade80; font-size: 20px; flex-shrink: 0; width: 36px; text-align: center; }
+
+    .pay-form { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2a2a; }
+    .pay-form.open { display: block; }
+    .pay-form-row { display: flex; gap: 8px; align-items: center; }
+    .pay-input-wrap { position: relative; flex: 1; }
+    .pay-input-wrap span {
+      position: absolute; left: 12px; top: 50%;
+      transform: translateY(-50%); color: #666; font-size: 14px; pointer-events: none;
+    }
+    .pay-input-wrap input { padding: 10px 10px 10px 32px; font-size: 14px; border-radius: 8px; }
+    .btn-confirmar {
+      background: #22c55e; color: #fff; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; padding: 10px 16px; cursor: pointer;
+      white-space: nowrap; transition: background 0.15s;
+    }
+    .btn-confirmar:hover { background: #16a34a; }
+    .btn-cancelar {
+      background: #2a2a2a; color: #888; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 500; padding: 10px 14px; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-cancelar:hover { background: #333; color: #ccc; }
+    .pay-nota { font-size: 11px; color: #555; margin-top: 7px; }
+
+    /* ── Dashboard ── */
+    .dash-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .dash-card, .dash-card-wide {
+      background: #111; border: 1px solid #2a2a2a; border-radius: 14px; padding: 16px;
+    }
+    .dash-card-wide { grid-column: 1 / -1; }
+    .dash-card-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .dash-card-val { font-size: 22px; font-weight: 700; color: #fff; line-height: 1.1; }
+    .dash-card-val .pfx { font-size: 13px; font-weight: 400; color: #555; margin-right: 2px; }
+
+    .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .progress-label  { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; }
+    .progress-pct    { font-size: 20px; font-weight: 700; }
+    .progress-bar-bg { height: 8px; background: #2a2a2a; border-radius: 99px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+    .progress-detail { display: flex; justify-content: space-between; font-size: 12px; color: #444; margin-top: 8px; }
+
+    .filtro-cat-wrap { margin-bottom: 16px; }
+    .filtro-cat-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .filtro-cat-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .filtro-pill {
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      border: 1px solid #2a2a2a; background: #111; color: #666;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .filtro-pill:hover { border-color: #444; color: #aaa; }
+    .filtro-pill.active { background: #2a2a2a; color: #fff; border-color: #3a3a3a; }
+
+    .d-section { margin-bottom: 20px; }
+    .d-section-title {
+      font-size: 11px; font-weight: 600; color: #555;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+    }
+    .alert-item, .warn-item {
+      border-radius: 12px; padding: 13px 15px; margin-bottom: 8px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .alert-item { background: #1a0f0f; border: 1px solid #3a1818; }
+    .warn-item  { background: #141008; border: 1px solid #3a2a08; }
+    .alert-nome { font-size: 14px; font-weight: 500; color: #f0f0f0; }
+    .alert-cat  { font-size: 11px; color: #555; margin-top: 2px; }
+    .alert-nums { text-align: right; flex-shrink: 0; }
+    .alert-val  { font-size: 14px; font-weight: 600; color: #f87171; }
+    .warn-val   { font-size: 14px; font-weight: 600; color: #fbbf24; }
+    .alert-orc  { font-size: 11px; color: #555; margin-top: 2px; }
+    .alert-diff { font-size: 11px; font-weight: 600; color: #f87171; background: #2a0a0a; border-radius: 20px; padding: 2px 8px; margin-top: 4px; display: inline-block; }
+    .warn-diff  { font-size: 11px; font-weight: 600; color: #fbbf24; background: #201508; border-radius: 20px; padding: 2px 8px; margin-top: 4px; display: inline-block; }
+
+    .chart-wrap { background: #111; border: 1px solid #2a2a2a; border-radius: 14px; padding: 20px; }
+    .chart-canvas-wrap { position: relative; max-width: 220px; margin: 0 auto 20px; }
+    .chart-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+    .chart-center-val   { font-size: 16px; font-weight: 700; color: #fff; }
+    .chart-center-label { font-size: 11px; color: #555; margin-top: 2px; }
+    .chart-legend { display: flex; flex-direction: column; gap: 8px; }
+    .legend-item  { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .legend-left  { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .legend-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-nome  { font-size: 13px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .legend-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .legend-val   { font-size: 13px; font-weight: 600; color: #fff; }
+    .legend-pct   { font-size: 11px; color: #444; }
+
+    .cat-item { background: #111; border: 1px solid #2a2a2a; border-radius: 12px; padding: 13px 15px; margin-bottom: 8px; }
+    .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .cat-nome   { font-size: 14px; font-weight: 500; color: #f0f0f0; }
+    .cat-vals   { font-size: 12px; color: #555; text-align: right; }
+    .cat-vals strong { color: #ccc; }
+    .cat-bar-bg   { height: 5px; background: #222; border-radius: 99px; overflow: hidden; }
+    .cat-bar-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; }
+    .cat-sub { display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px; }
+    .cat-restante.positivo { color: #555; }
+    .cat-restante.negativo { color: #f87171; }
+    .cat-pct { color: #444; }
+    .cat-pct.warn   { color: #fbbf24; }
+    .cat-pct.danger { color: #f87171; }
+    .item-linha {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 0; border-bottom: 1px solid #1a1a1a; font-size: 12px;
+    }
+    .item-linha:last-child { border-bottom: none; }
+
+    /* ── Estados ── */
+    .loading { display: flex; align-items: center; gap: 10px; color: #444; font-size: 13px; padding: 24px 0; justify-content: center; }
+    .spinner-sm {
+      width: 16px; height: 16px; border: 2px solid #2a2a2a; border-top-color: #3b82f6;
+      border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-box { background: #111; border: 1px solid #2a2a2a; border-radius: 14px; padding: 36px 20px; text-align: center; color: #444; font-size: 14px; }
+    .state-box.error { border-color: #3a1818; color: #f87171; }
+    .rodape { font-size: 11px; color: #333; text-align: center; margin-top: 20px; line-height: 1.5; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(90px);
+      background: #22c55e; color: #fff; padding: 12px 22px; border-radius: 40px;
+      font-size: 14px; font-weight: 500; max-width: calc(100vw - 32px); text-align: center;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 100;
+    }
+    .toast.error { background: #ef4444; }
+    .toast.show  { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="app-header">
+    <div>
+      <h1>Orçamento</h1>
+      <p class="subtitle" id="subtitulo">Carregando planilha...</p>
+    </div>
+    <button class="btn-refresh" id="btn-refresh" onclick="recarregar()">↻</button>
+  </div>
+
+  <!-- Seletor de mês — único, compartilhado pelas 3 abas -->
+  <div class="mes-selector" id="mes-selector" style="display:none">
+    <label>Mês</label>
+    <select id="mes-select" onchange="onMesChange()"></select>
+    <span class="mes-arrow">▼</span>
+  </div>
+
+  <div id="aviso-global"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="orcamento" onclick="switchTab('orcamento')">Lançar</button>
+    <button class="tab-btn"        data-tab="contas"    onclick="switchTab('contas')">Contas</button>
+    <button class="tab-btn"        data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+  </div>
+
+  <!-- ══════════ ABA: LANÇAR ══════════ -->
+  <div id="tab-orcamento" class="tab-content active">
+    <div id="orc-root">
+      <div class="loading"><div class="spinner-sm"></div> Carregando...</div>
+    </div>
+  </div>
+
+  <!-- ══════════ ABA: CONTAS ══════════ -->
+  <div id="tab-contas" class="tab-content">
+    <div id="contas-root">
+      <div class="loading"><div class="spinner-sm"></div> Carregando...</div>
+    </div>
+  </div>
+
+  <!-- ══════════ ABA: DASHBOARD ══════════ -->
+  <div id="tab-dashboard" class="tab-content">
+    <div class="filtro-cat-wrap" id="filtro-cat-wrap" style="display:none">
+      <div class="filtro-cat-label">Filtrar por categoria</div>
+      <div class="filtro-cat-pills" id="filtro-cat-pills"></div>
+    </div>
+    <div id="dash-root">
+      <div class="loading"><div class="spinner-sm"></div> Carregando...</div>
+    </div>
+  </div>
+
+  <div class="rodape" id="rodape"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Orçamento Ivan — front-end
+   O app NÃO conhece linhas nem valores fixos: tudo vem da aba selecionada.
+   Toda gravação vai para a coluna "Custo" e, por padrão, SOMA ao que já existe.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const SCRIPT_URL     = "https://script.google.com/macros/s/AKfycbzqTReKcLDHdURXEiuuOeOSZz0OTKqZezSq-I3ykzAsUySKw8I6Ayui1hXJG_QMks0d/exec";
+const VERSAO_BACKEND = "2026.08-somar";   // versão mínima esperada do Apps Script
+
+const CORES = {
+  "Casa": "#3b82f6", "Streaming e assinaturas": "#8b5cf6", "Parcelas casa": "#06b6d4",
+  "Alimentação": "#f59e0b", "Carro": "#ef4444", "Pessoal": "#10b981",
+  "Melina": "#f97316", "Baby": "#ec4899", "Financeiro": "#64748b",
+  "Presentes": "#a78bfa", "Lazer": "#84cc16", "Outros": "#94a3b8"
+};
+const EMOJIS = {
+  "Casa": "🏠", "Streaming e assinaturas": "📺", "Parcelas casa": "🛋️",
+  "Alimentação": "🛒", "Carro": "🚗", "Pessoal": "🧍", "Melina": "👧",
+  "Baby": "🍼", "Financeiro": "💰", "Presentes": "🎁", "Lazer": "🎉", "Outros": "📦"
+};
+const NOVO_ITEM = "__novo__";
+
+// ── Estado ──────────────────────────────────────────────────────────────────
+let abas            = [];
+let mesSelecionado  = '';
+let itens           = [];        // linhas da aba atual, vindas da planilha
+let abaAtiva        = 'orcamento';
+let filtroCategoria = 'Todos';
+let chartInst       = null;
+let modoLancamento  = 'somar';   // 'somar' | 'substituir'
+let enviando        = false;      // trava contra duplo envio
+let carregando      = false;
+
+// ── Utilitários ─────────────────────────────────────────────────────────────
+const fmt = v => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const normalizar = s => String(s == null ? '' : s)
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase().replace(/\s+/g, ' ').trim();
+
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+const corDe   = c => CORES[c]  || CORES[String(c).trim()]  || '#94a3b8';
+const emojiDe = c => EMOJIS[c] || EMOJIS[String(c).trim()] || '•';
+
+function hoje() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function showToast(msg, error) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (error ? ' error' : '') + ' show';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { t.className = 'toast' + (error ? ' error' : ''); }, 3600);
+}
+
+function avisar(html, tipo) {
+  document.getElementById('aviso-global').innerHTML =
+    html ? `<div class="aviso ${tipo || ''}">${html}</div>` : '';
+}
+
+/**
+ * JSONP — o Apps Script não manda cabeçalho CORS, então leitura E gravação
+ * passam por aqui. Diferente da versão antiga (iframe cego), agora sempre
+ * lemos a resposta e sabemos se a planilha foi realmente atualizada.
+ */
+function chamarScript(params) {
+  const qs = Object.keys(params)
+    .filter(k => params[k] !== undefined && params[k] !== null && params[k] !== '')
+    .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
+    .join('&');
+
+  return new Promise((resolve, reject) => {
+    const cb = '__cb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    const s  = document.createElement('script');
+    const timer = setTimeout(() => {
+      limpar();
+      reject(new Error('A planilha demorou demais para responder. Tente de novo.'));
+    }, 25000);
+
+    function limpar() {
+      clearTimeout(timer);
+      delete window[cb];
+      if (s.parentNode) s.parentNode.removeChild(s);
+    }
+    window[cb] = data => { limpar(); resolve(data); };
+    s.onerror  = ()   => { limpar(); reject(new Error('Não consegui falar com o Apps Script. Confira se a implantação está publicada.')); };
+    s.src = SCRIPT_URL + '?' + qs + '&callback=' + cb;
+    document.head.appendChild(s);
+  });
+}
+
+/** Avisa se o Apps Script publicado ainda for a versão que sobrescrevia. */
+function conferirVersao(resp) {
+  if (resp && resp.versao === VERSAO_BACKEND) { avisar(''); return; }
+  avisar(
+    '⚠️ <strong>Apps Script desatualizado.</strong> A versão publicada ainda é a antiga — ' +
+    'ela sobrescreve o valor da célula em vez de somar. Cole o arquivo ' +
+    '<code>apps-script/Codigo.gs</code> no editor e publique uma <em>nova versão</em> da implantação.',
+    'warn'
+  );
+}
+
+// ── Carregamento ────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await chamarScript({ action: 'getSheets' });
+    if (!r || !r.ok) throw new Error((r && r.error) || 'Não consegui listar os meses da planilha.');
+    conferirVersao(r);
+
+    abas = r.sheets || [];
+    if (!abas.length) throw new Error('A planilha não tem nenhuma aba de mês.');
+
+    mesSelecionado = r.mesAtual && abas.indexOf(r.mesAtual) >= 0 ? r.mesAtual : escolherMesAtual(abas);
+
+    const sel = document.getElementById('mes-select');
+    sel.innerHTML = abas.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    sel.value = mesSelecionado;
+    document.getElementById('mes-selector').style.display = 'flex';
+
+    await carregarMes();
+  } catch (e) {
+    erroGeral(e.message);
+  }
+}
+
+/** Escolhe a aba do mês corrente — antes o app abria sempre na ÚLTIMA aba. */
+function escolherMesAtual(lista) {
+  const nomes = ['janeiro','fevereiro','marco','abril','maio','junho',
+                 'julho','agosto','setembro','outubro','novembro','dezembro'];
+  const m = new Date().getMonth();
+  const achada = lista.find(s =>
+    normalizar(s).indexOf(nomes[m]) >= 0 || parseInt(String(s).trim(), 10) === m + 1
+  );
+  return achada || lista[lista.length - 1];
+}
+
+async function carregarMes() {
+  if (carregando) return;
+  carregando = true;
+
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled = true; btn.textContent = '…';
+  ['orc-root', 'contas-root', 'dash-root'].forEach(id => {
+    document.getElementById(id).innerHTML = '<div class="loading"><div class="spinner-sm"></div> Carregando...</div>';
+  });
+
+  try {
+    const r = await chamarScript({ action: 'read', sheet: mesSelecionado });
+    if (!r || !r.ok) throw new Error((r && r.error) || 'Erro ao ler a aba.');
+    conferirVersao(r);
+
+    itens = (r.data || []).map(d => ({
+      row:           d.row,
+      nome:          String(d.nome || '').trim(),
+      vencimento:    String(d.vencimento || '').trim(),
+      categoria:     String(d.categoria || '').trim() || 'Outros',
+      orcamento:     (d.orcamento === null || d.orcamento === undefined) ? null : Number(d.orcamento),
+      custo:         (d.custo === null || d.custo === undefined) ? null : Number(d.custo),
+      dataTransacao: String(d.dataTransacao || '').trim()
+    })).filter(d => d.nome);
+
+    document.getElementById('subtitulo').textContent =
+      `${r.sheet} — ${itens.length} itens · lançando na coluna ${(r.colunas && r.colunas.custo) || 'E'} (Custo)`;
+    document.getElementById('rodape').innerHTML =
+      `Aba <strong>${esc(r.sheet)}</strong> · orçamento na coluna ${esc((r.colunas || {}).orcamento || 'D')} · ` +
+      `custo na coluna ${esc((r.colunas || {}).custo || 'E')} · atualizado às ` +
+      new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    filtroCategoria = 'Todos';
+    renderTudo();
+  } catch (e) {
+    erroGeral(e.message);
+  } finally {
+    carregando = false;
+    btn.disabled = false; btn.textContent = '↻';
+  }
+}
+
+function erroGeral(msg) {
+  const html = `<div class="state-box error">⚠️ Não foi possível carregar os dados.
+    <span style="font-size:12px;color:#555;margin-top:8px;display:block">${esc(msg)}</span></div>`;
+  ['orc-root', 'contas-root', 'dash-root'].forEach(id => { document.getElementById(id).innerHTML = html; });
+  document.getElementById('subtitulo').textContent = 'Erro ao carregar';
+}
+
+function recarregar()   { carregarMes(); }
+function onMesChange()  {
+  mesSelecionado = document.getElementById('mes-select').value;
+  carregarMes();
+}
+
+function switchTab(tab) {
+  abaAtiva = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('filtro-cat-wrap').style.display = (tab === 'dashboard' && itens.length) ? 'block' : 'none';
+}
+
+/**
+ * Cada aba é desenhada isoladamente: se uma quebrar (ex.: o Chart.js do CDN
+ * não carregou), as outras continuam funcionando em vez de derrubar o app.
+ */
+function renderTudo() {
+  const partes = [
+    ['orc-root',    renderFormulario],
+    ['contas-root', renderContas],
+    [null,          renderFiltrosCategoria],
+    ['dash-root',   renderDashboard]
+  ];
+  partes.forEach(([alvo, fn]) => {
+    try {
+      fn();
+    } catch (e) {
+      console.error('Falha ao renderizar', alvo, e);
+      if (alvo) {
+        document.getElementById(alvo).innerHTML =
+          `<div class="state-box error">⚠️ Erro ao montar esta aba.
+            <span style="font-size:12px;color:#555;margin-top:8px;display:block">${esc(e.message)}</span></div>`;
+      }
+    }
+  });
+  document.getElementById('filtro-cat-wrap').style.display = (abaAtiva === 'dashboard' && itens.length) ? 'block' : 'none';
+}
+
+/** Aplica no estado local o resultado devolvido pelo Apps Script. */
+function aplicarResultado(res) {
+  const alvo = itens.find(i => i.row === res.row);
+  if (alvo) {
+    alvo.custo = Number(res.total);
+    if (res.orcamento !== null && res.orcamento !== undefined) alvo.orcamento = Number(res.orcamento);
+    alvo.dataTransacao = hoje();
+  } else {
+    itens.push({
+      row: res.row, nome: res.nome, vencimento: '',
+      categoria: String(res.categoria || 'Outros').trim() || 'Outros',
+      orcamento: (res.orcamento === null || res.orcamento === undefined) ? null : Number(res.orcamento),
+      custo: Number(res.total), dataTransacao: hoje()
+    });
+  }
+  renderTudo();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ABA: LANÇAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function categoriasDaAba() {
+  const vistas = [];
+  itens.forEach(i => { if (vistas.indexOf(i.categoria) < 0) vistas.push(i.categoria); });
+  return vistas.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+function renderFormulario() {
+  const root = document.getElementById('orc-root');
+  if (!itens.length) {
+    root.innerHTML = '<div class="state-box">Nenhum item nesta aba.</div>';
+    return;
+  }
+
+  const cats = categoriasDaAba();
+  root.innerHTML = `
+    <div class="field">
+      <label>Categoria</label>
+      <select id="f-categoria" onchange="onCategoriaChange()">
+        <option value="" disabled selected>Selecione uma categoria...</option>
+        ${cats.map(c => `<option value="${esc(c)}">${emojiDe(c)} ${esc(c)}</option>`).join('')}
+        <option disabled>──────────</option>
+        <option value="${NOVO_ITEM}">✏️ Novo item (não está na planilha)</option>
+      </select>
+    </div>
+
+    <div class="field" id="f-wrap-item">
+      <label>Item</label>
+      <select id="f-item" disabled onchange="onItemChange()">
+        <option value="" disabled selected>Selecione a categoria primeiro...</option>
+      </select>
+      <div class="item-info" id="f-info"></div>
+    </div>
+
+    <div class="field" id="f-wrap-novo" style="display:none">
+      <label>Descrição do novo item</label>
+      <input type="text" id="f-novo-desc" placeholder="Ex: Consulta médica, material de escola..." />
+      <div style="margin-top:14px">
+        <label>Categoria na planilha</label>
+        <select id="f-novo-cat">
+          ${cats.map(c => `<option value="${esc(c)}">${emojiDe(c)} ${esc(c)}</option>`).join('')}
+          ${cats.indexOf('Outros') < 0 ? '<option value="Outros">📦 Outros</option>' : ''}
+        </select>
+      </div>
+      <div class="modo-hint">A linha nova entra no fim da aba com o valor na coluna <strong>Custo</strong>. O orçamento previsto fica em branco.</div>
+    </div>
+
+    <div class="field">
+      <label>Valor gasto (R$)</label>
+      <div class="valor-wrap">
+        <span>R$</span>
+        <input type="number" id="f-valor" placeholder="0,00" step="0.01" min="0" oninput="atualizarPreview()" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Como gravar na célula</label>
+      <div class="modo-toggle">
+        <button type="button" class="modo-btn ${modoLancamento === 'somar' ? 'active' : ''}"
+                data-modo="somar" onclick="setModo('somar')">➕ Somar ao atual</button>
+        <button type="button" class="modo-btn ${modoLancamento === 'substituir' ? 'active' : ''}"
+                data-modo="substituir" onclick="setModo('substituir')">✏️ Substituir</button>
+      </div>
+      <div class="modo-hint" id="f-modo-hint"></div>
+    </div>
+
+    <button class="btn-primary" id="f-salvar" onclick="salvarLancamento()">Salvar na planilha</button>
+  `;
+  setModo(modoLancamento);
+}
+
+function setModo(modo) {
+  modoLancamento = modo;
+  document.querySelectorAll('.modo-btn').forEach(b => b.classList.toggle('active', b.dataset.modo === modo));
+  const hint = document.getElementById('f-modo-hint');
+  if (hint) {
+    hint.innerHTML = modo === 'somar'
+      ? 'O valor é <strong>somado</strong> ao que já está na coluna Custo — é assim que o gasto do mês acumula.'
+      : 'O valor <strong>substitui</strong> o que está na coluna Custo. Use só para corrigir um lançamento errado.';
+  }
+  atualizarPreview();
+}
+
+function onCategoriaChange() {
+  const cat   = document.getElementById('f-categoria').value;
+  const novo  = cat === NOVO_ITEM;
+  const sel   = document.getElementById('f-item');
+
+  document.getElementById('f-wrap-item').style.display = novo ? 'none' : '';
+  document.getElementById('f-wrap-novo').style.display = novo ? '' : 'none';
+  document.getElementById('f-info').classList.remove('show');
+
+  if (!novo) {
+    const daCat = itens.filter(i => i.categoria === cat);
+    sel.innerHTML = '<option value="" disabled selected>Selecione um item...</option>' +
+      daCat.map(i => `<option value="${i.row}">${esc(i.nome)}</option>`).join('');
+    sel.disabled = false;
+  }
+  atualizarPreview();
+}
+
+function itemSelecionado() {
+  const sel = document.getElementById('f-item');
+  if (!sel || !sel.value) return null;
+  return itens.find(i => i.row === parseInt(sel.value, 10)) || null;
+}
+
+function onItemChange() { atualizarPreview(); }
+
+function atualizarPreview() {
+  const info = document.getElementById('f-info');
+  if (!info) return;
+
+  const item = itemSelecionado();
+  if (!item) { info.classList.remove('show'); return; }
+
+  const valorInput = document.getElementById('f-valor');
+  const lancamento = parseFloat(valorInput && valorInput.value) || 0;
+  const atual      = item.custo || 0;
+  const total      = modoLancamento === 'substituir' ? (lancamento || atual) : atual + lancamento;
+  const orc        = item.orcamento;
+  const sobra      = orc === null ? null : orc - total;
+
+  info.innerHTML = `
+    <div class="info-linha"><span>Orçamento previsto</span><span>${orc === null ? '—' : 'R$ ' + fmt(orc)}</span></div>
+    <div class="info-linha"><span>Já gasto (coluna Custo)</span><span>R$ ${fmt(atual)}</span></div>
+    ${lancamento > 0 ? `<div class="info-linha"><span>${modoLancamento === 'substituir' ? 'Novo valor' : 'Somando agora'}</span><span>${modoLancamento === 'substituir' ? '' : '+ '}R$ ${fmt(lancamento)}</span></div>` : ''}
+    <div class="info-linha destaque ${sobra !== null && sobra < 0 ? 'estouro' : ''}">
+      <span>Fica com</span><span>R$ ${fmt(total)}</span>
+    </div>
+    ${sobra === null ? '' : `<div class="info-linha"><span>${sobra >= 0 ? 'Ainda sobra' : 'Estoura em'}</span><span style="color:${sobra >= 0 ? '#4ade80' : '#f87171'}">R$ ${fmt(Math.abs(sobra))}</span></div>`}
+  `;
+  info.classList.add('show');
+}
+
+async function salvarLancamento() {
+  if (enviando) return;
+  const cat   = document.getElementById('f-categoria').value;
+  const input = document.getElementById('f-valor');
+  const btn   = document.getElementById('f-salvar');
+  const valor = parseFloat(input.value);
+
+  if (!cat)                  { showToast('Selecione uma categoria', true); return; }
+  if (!valor || valor <= 0)  { showToast('Digite um valor válido', true);   return; }
+
+  let params;
+  if (cat === NOVO_ITEM) {
+    const desc = document.getElementById('f-novo-desc').value.trim();
+    if (!desc) { showToast('Digite a descrição do item', true); return; }
+    params = {
+      action: 'inserir', sheet: mesSelecionado, nome: desc,
+      categoria: document.getElementById('f-novo-cat').value,
+      value: valor, date: hoje(), modo: modoLancamento
+    };
+  } else {
+    const item = itemSelecionado();
+    if (!item) { showToast('Selecione um item', true); return; }
+    params = {
+      action: 'lancar', sheet: mesSelecionado, nome: item.nome,
+      row: item.row, value: valor, date: hoje(), modo: modoLancamento
+    };
+  }
+
+  enviando = true;
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try {
+    const res = await chamarScript(params);
+    if (!res || !res.ok) throw new Error((res && res.error) || 'A planilha recusou o lançamento.');
+    conferirVersao(res);
+
+    aplicarResultado(res);
+    const prefixo = res.reaproveitou ? `✓ Item já existia — somou em "${res.nome}": ` : `✓ ${res.nome}: `;
+    showToast(res.modo === 'substituir'
+      ? `${prefixo}R$ ${fmt(res.total)}`
+      : `${prefixo}R$ ${fmt(res.anterior)} + R$ ${fmt(res.lancado)} = R$ ${fmt(res.total)}`);
+
+    // Limpa o formulário mantendo a categoria, que costuma repetir
+    const valorEl = document.getElementById('f-valor');
+    if (valorEl) valorEl.value = '';
+    const descEl = document.getElementById('f-novo-desc');
+    if (descEl) descEl.value = '';
+    if (cat !== NOVO_ITEM) {
+      const catEl = document.getElementById('f-categoria');
+      if (catEl) { catEl.value = cat; onCategoriaChange(); }
+    }
+  } catch (e) {
+    showToast('✕ ' + e.message, true);
+  } finally {
+    enviando = false;
+    const b = document.getElementById('f-salvar');
+    if (b) { b.disabled = false; b.textContent = 'Salvar na planilha'; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ABA: CONTAS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Lê o vencimento da coluna B ("07/08", "20", "AUTOMÁTICO"). */
+function lerVencimento(txt) {
+  const s = String(txt || '').trim();
+  if (!s) return null;
+  if (/^autom/i.test(normalizar(s))) return { auto: true, label: 'débito automático' };
+  const m = s.match(/^(\d{1,2})(?:\/(\d{1,2}))?/);
+  if (!m) return null;
+  const dia = parseInt(m[1], 10);
+  if (dia < 1 || dia > 31) return null;
+  return { dia, label: 'vence dia ' + String(dia).padStart(2, '0') + (m[2] ? '/' + m[2].padStart(2, '0') : '') };
+}
+
+function contasDaAba() {
+  return itens
+    .map(i => ({ item: i, venc: lerVencimento(i.vencimento) }))
+    .filter(c => c.venc)
+    .sort((a, b) => {
+      if (a.venc.auto !== b.venc.auto) return a.venc.auto ? 1 : -1;
+      if (a.venc.auto) return a.item.nome.localeCompare(b.item.nome, 'pt-BR');
+      return a.venc.dia - b.venc.dia;
+    });
+}
+
+function renderContas() {
+  const root = document.getElementById('contas-root');
+  const contas = contasDaAba();
+
+  if (!contas.length) {
+    root.innerHTML = `<div class="state-box">Nenhuma conta com vencimento nesta aba.
+      <span style="font-size:12px;color:#555;margin-top:8px;display:block">
+        Preencha a coluna <strong>Data</strong> (B) com o dia do vencimento (ex.: 07/09) ou "AUTOMÁTICO".
+      </span></div>`;
+    return;
+  }
+
+  const diaHoje = new Date().getDate();
+  let aPagar = 0, qtdPagas = 0;
+
+  const html = contas.map(({ item, venc }) => {
+    const orc   = item.orcamento || 0;
+    const custo = item.custo || 0;
+    const pago  = custo > 0;
+    const falta = Math.max(orc - custo, 0);
+
+    if (pago && falta <= 0.005) qtdPagas++;
+    aPagar += pago ? falta : orc;
+
+    let badge = '';
+    if (pago && falta <= 0.005)        badge = '<span class="badge badge-pago">✓ Pago</span>';
+    else if (pago)                     badge = '<span class="badge badge-parcial">Parcial</span>';
+    else if (venc.auto)                badge = '<span class="badge badge-auto">Automático</span>';
+    else if (venc.dia < diaHoje)       badge = '<span class="badge badge-vencido">Vencido</span>';
+    else if (venc.dia === diaHoje)     badge = '<span class="badge badge-hoje">Hoje</span>';
+    else if (venc.dia - diaHoje <= 3)  badge = '<span class="badge badge-vence">Em breve</span>';
+
+    const quitado = pago && falta <= 0.005;
+    const sugerido = falta > 0 ? falta : orc;
+
+    return `
+      <div class="conta-item ${quitado ? 'pago' : ''}">
+        <div class="conta-row">
+          <div class="conta-info">
+            <div class="conta-nome">${esc(item.nome)}</div>
+            <div class="conta-meta"><span class="conta-venc">${esc(venc.label)}</span>${badge}</div>
+          </div>
+          <div class="conta-orc">
+            R$ ${fmt(pago ? custo : orc)}
+            ${pago && orc ? `<small>de R$ ${fmt(orc)} previsto</small>` : ''}
+          </div>
+          ${quitado
+            ? '<div class="btn-pago-icon">✓</div>'
+            : `<button class="btn-pagar" onclick="abrirPagamento(${item.row})">Pagar</button>`}
+        </div>
+        ${quitado ? '' : `
+        <div class="pay-form" id="pay-form-${item.row}">
+          <div class="pay-form-row">
+            <div class="pay-input-wrap">
+              <span>R$</span>
+              <input type="number" id="pay-input-${item.row}" value="${sugerido ? sugerido.toFixed(2) : ''}"
+                     step="0.01" min="0" oninput="atualizarTotalConta(${item.row})" />
+            </div>
+            <button class="btn-confirmar" onclick="confirmarPagamento(${item.row})">✓ Confirmar</button>
+            <button class="btn-cancelar" onclick="fecharPagamento(${item.row})">✕</button>
+          </div>
+          <div class="pay-nota">${custo > 0
+            ? `Já tem R$ ${fmt(custo)} lançado — este valor será <strong>somado</strong>, ficando R$ <span id="pay-total-${item.row}">${fmt(custo + sugerido)}</span>.`
+            : 'O valor vai para a coluna <strong>Custo</strong>.'}</div>
+        </div>`}
+      </div>`;
+  }).join('');
+
+  root.innerHTML = `
+    <div class="contas-total">
+      <div>
+        <div class="contas-total-label">Ainda a pagar</div>
+        <div class="contas-total-val"><span>R$</span>${fmt(aPagar)}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="contas-total-label">Quitadas</div>
+        <div style="font-size:15px;font-weight:600;color:#4ade80">${qtdPagas} / ${contas.length}</div>
+      </div>
+    </div>
+    <hr style="border:none;border-top:1px solid #222;margin:0 0 16px" />
+    ${html}`;
+}
+
+/** Mantém o "ficando R$ X" do rodapé do formulário em dia com o que foi digitado. */
+function atualizarTotalConta(row) {
+  const alvo = document.getElementById(`pay-total-${row}`);
+  if (!alvo) return;
+  const item  = itens.find(i => i.row === row);
+  const input = document.getElementById(`pay-input-${row}`);
+  if (!item || !input) return;
+  alvo.textContent = fmt((item.custo || 0) + (parseFloat(input.value) || 0));
+}
+
+function abrirPagamento(row) {
+  document.querySelectorAll('.pay-form.open').forEach(f => f.classList.remove('open'));
+  const form  = document.getElementById(`pay-form-${row}`);
+  const input = document.getElementById(`pay-input-${row}`);
+  if (form)  form.classList.add('open');
+  if (input) { input.focus(); input.select(); }
+}
+
+function fecharPagamento(row) {
+  const form = document.getElementById(`pay-form-${row}`);
+  if (form) form.classList.remove('open');
+}
+
+async function confirmarPagamento(row) {
+  if (enviando) return;
+  const item  = itens.find(i => i.row === row);
+  const input = document.getElementById(`pay-input-${row}`);
+  if (!item || !input) return;
+
+  const valor = parseFloat(input.value);
+  if (!valor || valor <= 0) { showToast('Digite um valor válido', true); return; }
+
+  const btn = input.closest('.pay-form-row').querySelector('.btn-confirmar');
+  enviando = true;
+  btn.disabled = true; btn.textContent = '...';
+
+  try {
+    // Contas sempre somam: quitação parcial em duas parcelas acumula certo.
+    const res = await chamarScript({
+      action: 'lancar', sheet: mesSelecionado, nome: item.nome,
+      row: item.row, value: valor, date: hoje(), modo: 'somar'
+    });
+    if (!res || !res.ok) throw new Error((res && res.error) || 'A planilha recusou o lançamento.');
+    conferirVersao(res);
+
+    aplicarResultado(res);
+    showToast(`✓ ${res.nome}: R$ ${fmt(res.total)} na coluna Custo`);
+  } catch (e) {
+    showToast('✕ ' + e.message, true);
+  } finally {
+    enviando = false;
+    const b = input.closest('.pay-form-row')?.querySelector('.btn-confirmar');
+    if (b) { b.disabled = false; b.textContent = '✓ Confirmar'; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ABA: DASHBOARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function renderFiltrosCategoria() {
+  const pills = document.getElementById('filtro-cat-pills');
+  if (!itens.length) { pills.innerHTML = ''; return; }
+  const cats = ['Todos'].concat(categoriasDaAba());
+  pills.innerHTML = cats.map(c =>
+    `<button class="filtro-pill ${filtroCategoria === c ? 'active' : ''}"
+      onclick="aplicarFiltro(${JSON.stringify(c).replace(/"/g, '&quot;')})">${esc(c)}</button>`
+  ).join('');
+}
+
+function aplicarFiltro(categoria) {
+  filtroCategoria = categoria;
+  renderFiltrosCategoria();
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const root = document.getElementById('dash-root');
+  if (chartInst) { try { chartInst.destroy(); } catch (e) {} chartInst = null; }
+
+  if (!itens.length) { root.innerHTML = '<div class="state-box">Sem dados nesta aba.</div>'; return; }
+
+  const linhas = (filtroCategoria === 'Todos') ? itens : itens.filter(i => i.categoria === filtroCategoria);
+
+  const cats = {};
+  let totalOrc = 0, totalGasto = 0;
+  linhas.forEach(r => {
+    if (!cats[r.categoria]) cats[r.categoria] = { orc: 0, gasto: 0, itens: [] };
+    cats[r.categoria].itens.push(r);
+    if (r.orcamento) { cats[r.categoria].orc   += r.orcamento; totalOrc   += r.orcamento; }
+    if (r.custo)     { cats[r.categoria].gasto += r.custo;     totalGasto += r.custo;     }
+  });
+
+  const pct    = totalOrc > 0 ? (totalGasto / totalOrc) * 100 : 0;
+  const saldo  = totalOrc - totalGasto;
+  const corBar = pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#22c55e';
+
+  const alertas = linhas.filter(r => r.custo && r.orcamento && r.custo > r.orcamento);
+  const atencao = linhas.filter(r => r.custo && r.orcamento && r.custo <= r.orcamento && (r.custo / r.orcamento) >= 0.8);
+
+  root.innerHTML = `
+    <div class="dash-cards">
+      <div class="dash-card">
+        <div class="dash-card-label">Total orçado</div>
+        <div class="dash-card-val"><span class="pfx">R$</span>${fmt(totalOrc)}</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Total gasto</div>
+        <div class="dash-card-val"><span class="pfx">R$</span>${fmt(totalGasto)}</div>
+      </div>
+      <div class="dash-card-wide">
+        <div class="progress-header">
+          <span class="progress-label">Execução do orçamento</span>
+          <span class="progress-pct" style="color:${corBar}">${pct.toFixed(1)}%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width:${Math.min(pct, 100)}%;background:${corBar}"></div>
+        </div>
+        <div class="progress-detail">
+          <span>Gasto: <strong style="color:#ccc">R$ ${fmt(totalGasto)}</strong></span>
+          <span>${saldo >= 0
+            ? 'Saldo: <strong style="color:#4ade80">R$ ' + fmt(saldo) + '</strong>'
+            : 'Estouro: <strong style="color:#f87171">R$ ' + fmt(Math.abs(saldo)) + '</strong>'}</span>
+        </div>
+      </div>
+    </div>
+
+    ${alertas.length ? `
+    <div class="d-section">
+      <div class="d-section-title">🔴 Acima do orçamento (${alertas.length})</div>
+      ${alertas.map(r => `
+        <div class="alert-item">
+          <div><div class="alert-nome">${esc(r.nome)}</div><div class="alert-cat">${esc(r.categoria)}</div></div>
+          <div class="alert-nums">
+            <div class="alert-val">R$ ${fmt(r.custo)}</div>
+            <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
+            <span class="alert-diff">+R$ ${fmt(r.custo - r.orcamento)}</span>
+          </div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    ${atencao.length ? `
+    <div class="d-section">
+      <div class="d-section-title">🟡 Atenção (${atencao.length})</div>
+      ${atencao.map(r => `
+        <div class="warn-item">
+          <div><div class="alert-nome">${esc(r.nome)}</div><div class="alert-cat">${esc(r.categoria)}</div></div>
+          <div class="alert-nums">
+            <div class="warn-val">R$ ${fmt(r.custo)}</div>
+            <div class="alert-orc">prev. R$ ${fmt(r.orcamento)}</div>
+            <span class="warn-diff">${((r.custo / r.orcamento) * 100).toFixed(0)}% usado</span>
+          </div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <div class="d-section">
+      <div class="d-section-title">Gastos por categoria</div>
+      <div class="chart-wrap">
+        <div class="chart-canvas-wrap">
+          <canvas id="pie-chart" width="220" height="220"></canvas>
+          <div class="chart-center">
+            <div class="chart-center-val">R$ ${fmt(totalGasto)}</div>
+            <div class="chart-center-label">gasto total</div>
+          </div>
+        </div>
+        <div class="chart-legend" id="chart-legend"></div>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Detalhes por categoria e item</div>
+      <div id="cat-breakdown"></div>
+    </div>`;
+
+  const comGasto = Object.keys(cats).filter(k => cats[k].gasto > 0)
+    .sort((a, b) => cats[b].gasto - cats[a].gasto);
+
+  // O gráfico é enfeite: se o Chart.js não carregou, o resto da tela continua de pé.
+  if (comGasto.length && typeof Chart !== 'undefined') {
+    chartInst = new Chart(document.getElementById('pie-chart').getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: comGasto,
+        datasets: [{
+          data: comGasto.map(k => cats[k].gasto),
+          backgroundColor: comGasto.map(corDe),
+          borderColor: '#111', borderWidth: 3, hoverOffset: 6
+        }]
+      },
+      options: {
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` R$ ${fmt(c.parsed)} (${((c.parsed / totalGasto) * 100).toFixed(1)}%)` } }
+        }
+      }
+    });
+  }
+
+  document.getElementById('chart-legend').innerHTML = comGasto.map(cat => `
+    <div class="legend-item">
+      <div class="legend-left"><div class="legend-dot" style="background:${corDe(cat)}"></div><span class="legend-nome">${esc(cat)}</span></div>
+      <div class="legend-right"><span class="legend-val">R$ ${fmt(cats[cat].gasto)}</span><span class="legend-pct">${totalGasto > 0 ? ((cats[cat].gasto / totalGasto) * 100).toFixed(0) : 0}%</span></div>
+    </div>`).join('');
+
+  const ordenadas = Object.keys(cats)
+    .filter(k => cats[k].orc > 0 || cats[k].gasto > 0)
+    .sort((a, b) => {
+      const pa = cats[a].orc > 0 ? cats[a].gasto / cats[a].orc : 0;
+      const pb = cats[b].orc > 0 ? cats[b].gasto / cats[b].orc : 0;
+      return pb - pa;
+    });
+
+  document.getElementById('cat-breakdown').innerHTML = ordenadas.map(cat => {
+    const v      = cats[cat];
+    const semOrc = v.orc === 0;
+    const p      = semOrc ? 100 : (v.gasto / v.orc) * 100;
+    const rest   = v.orc - v.gasto;
+    const cor    = semOrc ? '#64748b' : p > 100 ? '#ef4444' : p >= 80 ? '#f59e0b' : corDe(cat);
+    const cls    = semOrc ? '' : p > 100 ? 'danger' : p >= 80 ? 'warn' : '';
+
+    const itensHtml = v.itens.map(item => {
+      const ip   = (item.orcamento && item.custo) ? (item.custo / item.orcamento * 100) : null;
+      const cor2 = ip === null ? '#666' : ip > 100 ? '#ef4444' : ip >= 80 ? '#f59e0b' : '#888';
+      return `
+        <div class="item-linha">
+          <span style="color:#bbb;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.nome)}</span>
+          <span style="color:#666;margin-right:8px;font-size:11px">${item.orcamento === null ? '' : '/ R$ ' + fmt(item.orcamento)}</span>
+          <span style="color:${cor2};font-weight:500;min-width:74px;text-align:right">${item.custo === null ? '—' : 'R$ ' + fmt(item.custo)}</span>
+          <span style="color:${cor2};font-size:10px;margin-left:8px;min-width:36px;text-align:right">${ip === null ? '' : ip.toFixed(0) + '%'}</span>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="cat-item">
+        <div class="cat-header">
+          <span class="cat-nome">${emojiDe(cat)} ${esc(cat)}</span>
+          <span class="cat-vals"><strong>R$ ${fmt(v.gasto)}</strong>${semOrc ? '' : ` / R$ ${fmt(v.orc)}`}</span>
+        </div>
+        <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${Math.min(p, 100)}%;background:${cor}"></div></div>
+        <div class="cat-sub">
+          <span class="cat-restante ${semOrc ? '' : rest >= 0 ? 'positivo' : 'negativo'}">
+            ${semOrc ? 'sem orçamento previsto' : rest >= 0 ? `sobram R$ ${fmt(rest)}` : `estouro R$ ${fmt(Math.abs(rest))}`}
+          </span>
+          <span class="cat-pct ${cls}">${semOrc ? '—' : p.toFixed(0) + '%'}</span>
+        </div>
+        <div style="margin-top:8px;padding-top:4px;border-top:1px solid #222">${itensHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
