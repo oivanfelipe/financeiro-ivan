@@ -181,6 +181,11 @@
     .pag-diff.over  { background: #2a0a0a; color: #f87171; }
     .pag-diff.under { background: #0a2a0a; color: #4ade80; }
     .pag-diff.exact { background: #0a2a0a; color: #4ade80; }
+    .btn-pay-edit {
+      background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; border-radius: 12px;
+      padding: 0 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
+    }
+    .btn-pay-edit:hover { border-color: #6366f1; color: #818cf8; }
 
     .badge {
       display: inline-flex; align-items: center; font-size: 11px; font-weight: 600;
@@ -813,7 +818,10 @@ function buildContaCard(c) {
     : '';
 
   const payBtn = isPaid
-    ? `<div class="btn-pay-full paid-btn">✓ Pago R$ ${fmt(paid)}</div>`
+    ? `<div style="display:flex;gap:8px;align-items:stretch">
+        <div class="btn-pay-full paid-btn" style="flex:1">✓ Pago R$ ${fmt(paid)}</div>
+        <button class="btn-pay-edit" onclick="abrirPagamentoModal('${esc(c.id)}')">✏️ Editar</button>
+       </div>`
     : `<button class="btn-pay-full" onclick="abrirPagamentoModal('${esc(c.id)}')">
         ${paid > 0 ? '+ Adicionar pagamento' : 'Registrar pagamento'}
        </button>`;
@@ -1382,7 +1390,6 @@ function renderPerfil() {
         <button class="btn-nova" style="font-size:12px;padding:8px 14px" onclick="abrirCartaoModal()">+ Novo</button>
       </div>
       ${cardsHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhum cartão cadastrado</div>'}
-      <button class="btn-add-card" onclick="abrirCartaoModal()">+ Adicionar cartão ou método</button>
     </div>
   `;
 }
@@ -1502,12 +1509,15 @@ function abrirCartaoModal(pmId) {
 }
 
 async function salvarCartao() {
+  const btn = document.querySelector('#modal-content .btn-save');
+  if (btn?.disabled) return;
+  if (btn) btn.disabled = true;
   const pmId = document.getElementById('cart-id').value;
   const nome = document.getElementById('cart-nome').value.trim();
   const tipo = document.getElementById('cart-tipo').value;
   const dia  = parseInt(document.getElementById('cart-dia').value) || null;
   const cor  = document.getElementById('cart-cor').value;
-  if (!nome) { showToast('Informe o nome','error'); return; }
+  if (!nome) { showToast('Informe o nome','error'); if (btn) btn.disabled = false; return; }
   try {
     if (pmId) {
       const { error: upErr } = await sb.from('fin_payment_methods').update({name:nome,type:tipo,billing_day:dia,color:cor}).eq('id',pmId);
@@ -1520,7 +1530,7 @@ async function salvarCartao() {
     fecharModal();
     renderPerfil();
     showToast('Cartão salvo ✓','success');
-  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
+  } catch(e) { if (btn) btn.disabled = false; showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
 }
 
 async function deletarCartao(id, nome) {
