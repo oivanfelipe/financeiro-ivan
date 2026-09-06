@@ -1195,6 +1195,22 @@ function renderPerfil() {
       </div>`;
   }).join('');
 
+  const tetosHtml = categories.map(cat => {
+    const budget = categoryBudgets.find(b => b.category_id === cat.id && !b.month);
+    const meta   = budget ? `Teto: R$ ${fmt(budget.limit_amount)}` : 'Sem teto';
+    return `
+      <div class="card-item">
+        <span style="font-size:20px;min-width:28px;text-align:center">${esc(cat.emoji||'•')}</span>
+        <div class="card-info">
+          <div class="card-name">${esc(cat.name)}</div>
+          <div class="card-meta">${meta}</div>
+        </div>
+        <div class="card-actions">
+          <button class="btn-card-act" onclick="abrirTetoModal('${esc(cat.id)}')">✏️</button>
+        </div>
+      </div>`;
+  }).join('');
+
   el.innerHTML = `
     <div style="text-align:center;margin-bottom:24px"><div class="perfil-avatar">👤</div></div>
     <div class="perfil-section">
@@ -1214,6 +1230,10 @@ function renderPerfil() {
       </div>
       ${cardsHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhum cartão cadastrado</div>'}
       <button class="btn-add-card" onclick="abrirCartaoModal()">+ Adicionar cartão ou método</button>
+    </div>
+    <div class="perfil-section">
+      <div class="perfil-section-title">Tetos de gastos</div>
+      ${tetosHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhuma categoria cadastrada</div>'}
     </div>
   `;
 }
@@ -1292,6 +1312,54 @@ async function deletarCartao(id, nome) {
   paymentMethods = paymentMethods.filter(p => p.id!==id);
   renderPerfil();
   showToast('Cartão removido','success');
+}
+
+// === TETOS DE GASTOS ===
+function abrirTetoModal(catId) {
+  const cat    = categories.find(c => c.id === catId);
+  const budget = categoryBudgets.find(b => b.category_id === catId && !b.month);
+  const valorAtual = budget ? Number(budget.limit_amount).toFixed(2) : '';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Teto de gasto — ${esc(cat?.emoji||'')} ${esc(cat?.name||'Categoria')}</div>
+    <input type="hidden" id="teto-cat-id" value="${esc(catId)}" />
+    <div class="field">
+      <label>Limite mensal (R$)</label>
+      <input type="number" id="teto-valor" value="${valorAtual}" step="0.01" min="0" placeholder="Ex: 1500,00" inputmode="decimal" />
+    </div>
+    <p style="font-size:12px;color:#555;margin-bottom:12px">Deixe vazio ou zero para remover o teto.</p>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarTeto()">Salvar</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('teto-valor')?.focus(), 100);
+}
+
+async function salvarTeto() {
+  const catId = document.getElementById('teto-cat-id').value;
+  const valor = parseFloat(document.getElementById('teto-valor').value) || 0;
+  try {
+    const existing = categoryBudgets.find(b => b.category_id === catId && !b.month);
+    if (valor > 0) {
+      if (existing) {
+        const { error } = await sb.from('fin_category_budgets').update({ limit_amount: valor }).eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await sb.from('fin_category_budgets').insert({ category_id: catId, limit_amount: valor });
+        if (error) throw error;
+      }
+    } else if (existing) {
+      const { error } = await sb.from('fin_category_budgets').delete().eq('id', existing.id);
+      if (error) throw error;
+    }
+    const { data } = await sb.from('fin_category_budgets').select('*');
+    categoryBudgets = data || [];
+    fecharModal();
+    renderPerfil();
+    dirtyTabs.add('dashboard');
+    showToast(valor > 0 ? 'Teto salvo ✓' : 'Teto removido', 'success');
+  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)), 'error'); }
 }
 
 // === MODAL ===
