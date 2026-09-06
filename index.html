@@ -1051,6 +1051,29 @@ function abrirEditarCommitment(id) {
       </div>
     </div>
     <input type="hidden" id="edit-recurrence" value="${esc(recType)}" />
+    <div id="edit-repeat-section" style="margin-bottom:12px;${recType==='pontual'?'display:none':''}">
+      <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Repetição / Parcelas</div>
+      <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
+          <input type="radio" name="edit-rep" value="unico" checked onchange="onEditRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+          Só este mês
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="edit-rep" value="repetir" onchange="onEditRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+          Repetir por mais
+          <input type="number" id="edit-meses" min="1" max="60" value="6" disabled
+            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+          meses
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="edit-rep" value="parcelar" onchange="onEditRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+          Em mais
+          <input type="number" id="edit-parcelas" min="1" max="60" value="6" disabled
+            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+          parcelas
+        </label>
+      </div>
+    </div>
     <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
         <input type="checkbox" id="edit-auto-toggle" onchange="toggleAutoCardEdit()" ${autoOn?'checked':''} style="width:18px;height:18px;accent-color:#6366f1" />
@@ -1086,15 +1109,41 @@ async function salvarEdicao() {
   const autoOn         = document.getElementById('edit-auto-toggle')?.checked;
   const defPmId        = autoOn ? (document.getElementById('edit-card')?.value || null) : null;
   const tipo           = recurrenceType === 'pontual' ? 'pontual' : 'fixo';
+  const repMode        = document.querySelector('input[name="edit-rep"]:checked')?.value || 'unico';
+  const nMeses         = Math.max(1, parseInt(document.getElementById('edit-meses')?.value) || 6);
+  const nParcelas      = Math.max(1, parseInt(document.getElementById('edit-parcelas')?.value) || 6);
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
 
+  function addMeses(m, a, n) {
+    const total = (a * 12 + m - 1) + n;
+    return { month: (total % 12) + 1, year: Math.floor(total / 12) };
+  }
+
+  const btn = document.querySelector('#modal-content .btn-save');
+  if (btn) btn.disabled = true;
   try {
-    const { error } = await sb.from('fin_commitments').update({ name:nome, category_id:catId, planned_amount:valor, due_day:dia, type:tipo, recurrence_type:recurrenceType, default_payment_method_id: defPmId }).eq('id', id);
+    const { error } = await sb.from('fin_commitments').update({ name: nome, category_id: catId, planned_amount: valor, due_day: dia, type: tipo, recurrence_type: recurrenceType, default_payment_method_id: defPmId }).eq('id', id);
     if (error) throw error;
-    fecharModal();
-    await loadMes();
-    showToast('Despesa atualizada ✓','success');
-  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
+
+    if (repMode === 'parcelar' && nParcelas >= 1) {
+      for (let i = 1; i <= nParcelas; i++) {
+        const { month, year } = addMeses(mesAtual, anoAtual, i);
+        await insertCommitment({ month, year, name: `${nome} (${i+1}/${nParcelas+1})`, category_id: catId, type: 'pontual', planned_amount: valor, due_day: dia, default_payment_method_id: defPmId, recurrence_type: 'pontual' });
+      }
+      fecharModal(); await loadMes(); showToast(`Atualizado + ${nParcelas} parcelas criadas ✓`, 'success');
+    } else if (repMode === 'repetir' && nMeses >= 1) {
+      for (let i = 1; i <= nMeses; i++) {
+        const { month, year } = addMeses(mesAtual, anoAtual, i);
+        await insertCommitment({ month, year, name: nome, category_id: catId, type: tipo, planned_amount: valor, due_day: dia, default_payment_method_id: defPmId, recurrence_type: recurrenceType });
+      }
+      fecharModal(); await loadMes(); showToast(`Atualizado + ${nMeses} meses criados ✓`, 'success');
+    } else {
+      fecharModal(); await loadMes(); showToast('Despesa atualizada ✓', 'success');
+    }
+  } catch(e) {
+    if (btn) btn.disabled = false;
+    showToast('Erro: '+(e.message||JSON.stringify(e)),'error');
+  }
 }
 
 async function deletarCommitment(id, nome) {
@@ -1194,6 +1243,18 @@ function selecionarRec(prefix, tipo) {
     const rep = document.getElementById('nc-repeat-section');
     if (rep) rep.style.display = tipo === 'pontual' ? 'none' : 'block';
   }
+  if (prefix === 'edit') {
+    const rep = document.getElementById('edit-repeat-section');
+    if (rep) rep.style.display = tipo === 'pontual' ? 'none' : 'block';
+  }
+}
+
+function onEditRepChange() {
+  const v = document.querySelector('input[name="edit-rep"]:checked')?.value;
+  const meses = document.getElementById('edit-meses');
+  const parcelas = document.getElementById('edit-parcelas');
+  if (meses) meses.disabled = v !== 'repetir';
+  if (parcelas) parcelas.disabled = v !== 'parcelar';
 }
 
 function onRepChange() {
