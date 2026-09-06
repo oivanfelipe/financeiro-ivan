@@ -186,6 +186,13 @@
       padding: 0 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
     }
     .btn-pay-edit:hover { border-color: #6366f1; color: #818cf8; }
+    .pay-hist-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px solid #1a1a1a;
+    }
+    .pay-hist-info { display: flex; flex-direction: column; gap: 2px; }
+    .pay-hist-val  { font-size: 14px; font-weight: 600; color: #e0e0e0; }
+    .pay-hist-meta { font-size: 11px; color: #555; }
 
     .badge {
       display: inline-flex; align-items: center; font-size: 11px; font-weight: 600;
@@ -866,7 +873,7 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.menu-btn') && !e.target.closest('.menu-popup')) fecharMenus();
 });
 
-function abrirPagamentoModal(id) {
+async function abrirPagamentoModal(id) {
   const c = commitments.find(x => x.id===id);
   if (!c) return;
   const rem  = Number(c.remaining);
@@ -882,13 +889,33 @@ function abrirPagamentoModal(id) {
     </div>`;
   }).join('');
 
+  // Buscar pagamentos existentes
+  const { data: pagamentos } = await sb.from('fin_commitment_payments')
+    .select('*').eq('commitment_id', id).order('payment_date');
+
+  const pagListHtml = (pagamentos||[]).length ? `
+    <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pagamentos registrados</div>
+    ${(pagamentos||[]).map(pg => {
+      const pm = paymentMethods.find(p => p.id===pg.payment_method_id);
+      const dataFmt = pg.payment_date ? new Date(pg.payment_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '';
+      return `<div class="pay-hist-item">
+        <div class="pay-hist-info">
+          <span class="pay-hist-val">R$ ${fmt(pg.amount)}</span>
+          <span class="pay-hist-meta">${pm?esc(pm.name):''}${dataFmt?' · '+dataFmt:''}</span>
+        </div>
+        <button class="btn-card-act btn-card-del" onclick="deletarPagamento('${esc(pg.id)}','${esc(id)}')">🗑️</button>
+      </div>`;
+    }).join('')}
+    <div style="border-top:1px solid #1a1a1a;margin:12px 0"></div>` : '';
+
   const paidInfo = paid > 0.005 ? `<span style="color:#555"> · já pago: R$ ${fmt(paid)}</span>` : '';
 
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
-    <div class="modal-title">Registrar pagamento</div>
+    <div class="modal-title">Pagamento</div>
     <div style="font-size:14px;color:#aaa;margin-bottom:4px">${esc(c.name)}</div>
     <div style="font-size:12px;color:#555;margin-bottom:16px">Previsto: <strong style="color:#e0e0e0">R$ ${fmt(plan)}</strong>${paidInfo}</div>
+    ${pagListHtml}
     <div class="field">
       <label>Valor pago (R$)</label>
       <input type="number" id="pay-val" value="${sugestao}" step="0.01" min="0.01" inputmode="decimal" />
@@ -900,13 +927,23 @@ function abrirPagamentoModal(id) {
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
-      <button class="btn-save" onclick="confirmarPagamento('${esc(id)}')">Confirmar</button>
+      <button class="btn-save" onclick="confirmarPagamento('${esc(id)}')">Adicionar</button>
     </div>`;
   document.getElementById('modal-overlay').classList.remove('hidden');
   setTimeout(() => {
     document.getElementById('pay-val')?.focus();
     if (c.default_payment_method_id) selecionarMetodo(c.default_payment_method_id);
   }, 100);
+}
+
+async function deletarPagamento(pagId, commitmentId) {
+  if (!confirm('Excluir este pagamento?')) return;
+  const { error } = await sb.from('fin_commitment_payments').delete().eq('id', pagId);
+  if (error) { showToast('Erro: '+error.message,'error'); return; }
+  await loadMes();
+  showToast('Pagamento removido','success');
+  // Reabrir modal com dados atualizados
+  abrirPagamentoModal(commitmentId);
 }
 
 function selecionarMetodo(pmId) {
