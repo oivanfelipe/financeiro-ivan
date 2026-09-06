@@ -177,6 +177,10 @@
     .conta-val  { font-size: 17px; font-weight: 700; color: #fff; }
     .conta-paid { font-size: 11px; color: #4ade80; margin-top: 2px; }
     .conta-rem  { font-size: 12px; color: #f87171; margin-top: 2px; }
+    .pag-diff { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin: 6px 0 4px; display: inline-block; }
+    .pag-diff.over  { background: #2a0a0a; color: #f87171; }
+    .pag-diff.under { background: #0a2a0a; color: #4ade80; }
+    .pag-diff.exact { background: #0a2a0a; color: #4ade80; }
 
     .badge {
       display: inline-flex; align-items: center; font-size: 11px; font-weight: 600;
@@ -799,8 +803,17 @@ function buildContaCard(c) {
     fatura:  `<span class="badge badge-fatura">💳 Fatura</span>`
   };
 
+  const diff = paid - plan;
+  const diffHtml = isPaid
+    ? diff > 0.005
+      ? `<div class="pag-diff over">+R$ ${fmt(diff)} acima do previsto</div>`
+      : diff < -0.005
+        ? `<div class="pag-diff under">-R$ ${fmt(Math.abs(diff))} economizado</div>`
+        : `<div class="pag-diff exact">Valor exato ✓</div>`
+    : '';
+
   const payBtn = isPaid
-    ? `<div class="btn-pay-full paid-btn">✓ Pago</div>`
+    ? `<div class="btn-pay-full paid-btn">✓ Pago R$ ${fmt(paid)}</div>`
     : `<button class="btn-pay-full" onclick="abrirPagamentoModal('${esc(c.id)}')">
         ${paid > 0 ? '+ Adicionar pagamento' : 'Registrar pagamento'}
        </button>`;
@@ -819,11 +832,13 @@ function buildContaCard(c) {
           ${badgeMap[status]||''}${defPmBadge}
         </div>
         <div class="conta-right">
-          <div class="conta-val">R$ ${fmt(plan)}</div>
+          <div class="conta-val ${isPaid&&diff>0.005?'red':''}" style="font-size:${isPaid?'12px':'16px'};${isPaid?'color:#666':''}">Prev. R$ ${fmt(plan)}</div>
+          ${isPaid?`<div class="conta-val">R$ ${fmt(paid)}</div>`:''}
           ${paid>0&&!isPaid?`<div class="conta-paid">Pago: R$ ${fmt(paid)}</div>`:''}
           ${rem>0.005?`<div class="conta-rem">Falta: R$ ${fmt(rem)}</div>`:''}
         </div>
       </div>
+      ${diffHtml}
       ${pct>0&&!isPaid?`<div class="conta-prog"><div class="progress-bar"><div class="progress-fill ${barClass}" style="width:${pct}%"></div></div></div>`:''}
       ${payBtn}
     </div>`;
@@ -848,6 +863,7 @@ function abrirPagamentoModal(id) {
   if (!c) return;
   const rem  = Number(c.remaining);
   const plan = Number(c.planned_amount);
+  const paid = Number(c.paid);
   const sugestao = (rem > 0.005 ? rem : plan).toFixed(2);
 
   const pmOpts = paymentMethods.filter(p => p.active !== false).map(p => {
@@ -858,15 +874,18 @@ function abrirPagamentoModal(id) {
     </div>`;
   }).join('');
 
+  const paidInfo = paid > 0.005 ? `<span style="color:#555"> · já pago: R$ ${fmt(paid)}</span>` : '';
+
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Registrar pagamento</div>
-    <div style="font-size:14px;color:#888;margin-bottom:16px">${esc(c.name)}</div>
+    <div style="font-size:14px;color:#aaa;margin-bottom:4px">${esc(c.name)}</div>
+    <div style="font-size:12px;color:#555;margin-bottom:16px">Previsto: <strong style="color:#e0e0e0">R$ ${fmt(plan)}</strong>${paidInfo}</div>
     <div class="field">
-      <label>Valor (R$)</label>
+      <label>Valor pago (R$)</label>
       <input type="number" id="pay-val" value="${sugestao}" step="0.01" min="0.01" inputmode="decimal" />
     </div>
-    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Método de pagamento</div>
+    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pago com</div>
     <div class="method-grid">${pmOpts || '<div style="color:#555;font-size:13px;padding:8px">Nenhum método cadastrado</div>'}</div>
     <div id="credit-note" style="display:none;background:#1a1a2a;border:1px solid #2a2a3a;border-radius:10px;padding:10px 14px;font-size:12px;color:#818cf8;margin-bottom:12px">
       💳 Lançado na fatura do cartão (próximo mês).
@@ -1338,7 +1357,7 @@ function renderPerfil() {
       </div>
       <div class="field"><label>💰 Renda mensal (R$)</label>
         <div class="perfil-renda">
-          <input type="number" id="p-renda" value="${p.rendaMensal||''}" step="0.01" min="0" placeholder="Ex: 5000,00" inputmode="decimal" />
+          <input type="text" id="p-renda" value="${p.rendaMensal ? fmt(p.rendaMensal) : ''}" inputmode="decimal" placeholder="Ex: 5.000,00" />
         </div>
       </div>
       <div class="field"><label>📅 Dia de recebimento</label>
@@ -1375,7 +1394,8 @@ function carregarPerfil() {
 function salvarPerfil() {
   const nome  = document.getElementById('p-nome')?.value?.trim() || '';
   const dia   = parseInt(document.getElementById('p-dia')?.value) || null;
-  const renda = parseFloat(document.getElementById('p-renda')?.value) || null;
+  const rendaRaw = (document.getElementById('p-renda')?.value || '').replace(/\./g,'').replace(',','.');
+  const renda = parseFloat(rendaRaw) || null;
   const p = carregarPerfil();
   p.nome = nome; p.diaRecebimento = dia; p.rendaMensal = renda;
   localStorage.setItem('oiv2_perfil', JSON.stringify(p));
