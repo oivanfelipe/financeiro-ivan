@@ -67,7 +67,7 @@
 
     /* Toast */
     .toast {
-      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(80px);
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(200px);
       background: #1e1e1e; border: 1px solid #333; color: #f0f0f0;
       border-radius: 24px; padding: 10px 18px; font-size: 13px;
       display: flex; align-items: center; gap: 10px;
@@ -366,6 +366,21 @@
       margin-top: 6px; min-height: 48px;
     }
     .btn-add-card:hover { border-color: #6366f1; color: #818cf8; }
+    .cat-item {
+      display: flex; align-items: center; gap: 10px; padding: 12px 0;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .cat-emoji { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; }
+    .cat-name { flex: 1; font-size: 14px; font-weight: 500; color: #e0e0e0; }
+    .cat-actions { display: flex; gap: 6px; }
+    .emoji-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .emoji-opt { font-size: 20px; cursor: pointer; padding: 4px; border-radius: 6px; border: 1px solid transparent; }
+    .emoji-opt:hover { border-color: #6366f1; background: #1e1e2e; }
+    .emoji-opt.sel { border-color: #6366f1; background: #1e1e2e; }
+    .perfil-renda {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    }
+    .perfil-renda input { flex: 1; }
 
     /* Modal (bottom sheet) */
     .modal-overlay {
@@ -500,7 +515,7 @@ function showToast(msg, type='', showRetry=false) {
   t.className = 'toast show' + (type ? ' '+type : '');
   document.getElementById('toast-retry').style.display = (showRetry && ultimaAcaoParams) ? 'inline-block' : 'none';
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => { t.className = 'toast'+(type?' '+type:''); }, 4000);
+  showToast._t = setTimeout(() => { t.className = 'toast'; }, 4000);
 }
 
 function avisar(html, tipo) {
@@ -1288,6 +1303,16 @@ function renderPerfil() {
       </div>`;
   }).join('');
 
+  const catsHtml = categories.map(cat => `
+    <div class="cat-item">
+      <span class="cat-emoji">${esc(cat.emoji||'•')}</span>
+      <span class="cat-name">${esc(cat.name)}</span>
+      <div class="cat-actions">
+        <button class="btn-card-act" onclick="abrirCatModal('${esc(cat.id)}')">✏️</button>
+        <button class="btn-card-act btn-card-del" onclick="deletarCategoria('${esc(cat.id)}','${esc(cat.name)}')">🗑️</button>
+      </div>
+    </div>`).join('');
+
   const tetosHtml = categories.map(cat => {
     const budget = categoryBudgets.find(b => b.category_id === cat.id && !b.month);
     const meta   = budget ? `Teto: R$ ${fmt(budget.limit_amount)}` : 'Sem teto';
@@ -1311,10 +1336,26 @@ function renderPerfil() {
       <div class="field"><label>Nome</label>
         <input type="text" id="p-nome" value="${esc(p.nome||'')}" placeholder="Seu nome" />
       </div>
-      <div class="field"><label>Dia de recebimento do salário</label>
+      <div class="field"><label>💰 Renda mensal (R$)</label>
+        <div class="perfil-renda">
+          <input type="number" id="p-renda" value="${p.rendaMensal||''}" step="0.01" min="0" placeholder="Ex: 5000,00" inputmode="decimal" />
+        </div>
+      </div>
+      <div class="field"><label>📅 Dia de recebimento</label>
         <input type="number" id="p-dia" value="${p.diaRecebimento||''}" min="1" max="31" placeholder="Ex: 30" />
       </div>
-      <button class="btn-primary" onclick="salvarPerfil()" style="margin-top:4px">Salvar</button>
+      <button class="btn-primary" onclick="salvarPerfil()" style="margin-top:4px">Salvar dados</button>
+    </div>
+    <div class="perfil-section">
+      <div class="perfil-section-title">
+        <span>Categorias</span>
+        <button class="btn-nova" style="font-size:12px;padding:8px 14px" onclick="abrirCatModal()">+ Nova</button>
+      </div>
+      ${catsHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhuma categoria. Crie a primeira!</div>'}
+    </div>
+    <div class="perfil-section">
+      <div class="perfil-section-title">Tetos de gastos</div>
+      ${tetosHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Crie categorias primeiro</div>'}
     </div>
     <div class="perfil-section">
       <div class="perfil-section-title">
@@ -1324,10 +1365,6 @@ function renderPerfil() {
       ${cardsHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhum cartão cadastrado</div>'}
       <button class="btn-add-card" onclick="abrirCartaoModal()">+ Adicionar cartão ou método</button>
     </div>
-    <div class="perfil-section">
-      <div class="perfil-section-title">Tetos de gastos</div>
-      ${tetosHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhuma categoria cadastrada</div>'}
-    </div>
   `;
 }
 
@@ -1336,12 +1373,80 @@ function carregarPerfil() {
 }
 
 function salvarPerfil() {
-  const nome = document.getElementById('p-nome')?.value?.trim() || '';
-  const dia  = parseInt(document.getElementById('p-dia')?.value) || null;
+  const nome  = document.getElementById('p-nome')?.value?.trim() || '';
+  const dia   = parseInt(document.getElementById('p-dia')?.value) || null;
+  const renda = parseFloat(document.getElementById('p-renda')?.value) || null;
   const p = carregarPerfil();
-  p.nome = nome; p.diaRecebimento = dia;
+  p.nome = nome; p.diaRecebimento = dia; p.rendaMensal = renda;
   localStorage.setItem('oiv2_perfil', JSON.stringify(p));
   showToast('Perfil salvo ✓','success');
+}
+
+// === CRUD CATEGORIAS ===
+const EMOJIS_SUGERIDOS = ['🏠','🚗','🍔','🛒','💊','🎮','📚','✈️','👕','🐾','💡','📱','🎬','🏋️','💰','🎁'];
+
+function abrirCatModal(catId) {
+  const cat = catId ? categories.find(c => c.id === catId) : null;
+  const emojiOpts = EMOJIS_SUGERIDOS.map(e =>
+    `<span class="emoji-opt${cat?.emoji===e?' sel':''}" onclick="selecionarEmoji(this,'${e}')">${e}</span>`
+  ).join('');
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">${cat ? 'Editar categoria' : 'Nova categoria'}</div>
+    <input type="hidden" id="cat-id" value="${esc(catId||'')}" />
+    <div class="field"><label>Emoji</label>
+      <div class="emoji-picker">${emojiOpts}</div>
+      <input type="text" id="cat-emoji" value="${esc(cat?.emoji||'')}" maxlength="2" placeholder="Ou digite um emoji..." style="margin-top:4px" />
+    </div>
+    <div class="field"><label>Nome</label>
+      <input type="text" id="cat-nome" value="${esc(cat?.name||'')}" placeholder="Ex: Alimentação, Moradia..." />
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarCategoria()">Salvar</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('cat-nome')?.focus(), 100);
+}
+
+function selecionarEmoji(el, emoji) {
+  document.querySelectorAll('.emoji-opt').forEach(e => e.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('cat-emoji').value = emoji;
+}
+
+async function salvarCategoria() {
+  const catId = document.getElementById('cat-id').value;
+  const emoji = document.getElementById('cat-emoji').value.trim() || '•';
+  const nome  = document.getElementById('cat-nome').value.trim();
+  if (!nome) { showToast('Informe o nome da categoria','error'); return; }
+  try {
+    if (catId) {
+      const { error } = await sb.from('fin_categories').update({ name: nome, emoji }).eq('id', catId);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from('fin_categories').insert({ name: nome, emoji });
+      if (error) throw error;
+    }
+    const { data } = await sb.from('fin_categories').select('*').order('sort_order');
+    categories = data || [];
+    fecharModal();
+    renderPerfil();
+    dirtyTabs.add('planejamento'); dirtyTabs.add('pagar'); dirtyTabs.add('dashboard');
+    showToast(catId ? 'Categoria atualizada ✓' : 'Categoria criada ✓', 'success');
+  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
+}
+
+async function deletarCategoria(id, nome) {
+  if (!confirm(`Excluir categoria "${nome}"?`)) return;
+  const { count } = await sb.from('fin_commitments').select('id', { count: 'exact', head: true }).eq('category_id', id);
+  if (count > 0) { showToast('Categoria em uso, remova as despesas primeiro','error'); return; }
+  const { error } = await sb.from('fin_categories').delete().eq('id', id);
+  if (error) { showToast('Erro: '+error.message,'error'); return; }
+  categories = categories.filter(c => c.id !== id);
+  renderPerfil();
+  dirtyTabs.add('planejamento'); dirtyTabs.add('pagar'); dirtyTabs.add('dashboard');
+  showToast('Categoria removida','success');
 }
 
 function abrirCartaoModal(pmId) {
@@ -1484,7 +1589,7 @@ function navMes(delta) {
   loadMes();
 }
 
-async function recarregar() { await loadMes(); showToast('Dados atualizados ✓','success'); }
+async function recarregar() { await loadAll(); showToast('Dados atualizados ✓','success'); }
 
 async function retentarUltimaAcao() {
   if (!ultimaAcaoParams) return;
