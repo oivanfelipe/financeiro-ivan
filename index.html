@@ -537,6 +537,12 @@ async function loadMes() {
   spendingEntries = spend.data || [];
   spendingSummary = spSum.data || [];
 
+  const { data: rawCmts } = await sb.from('fin_commitments')
+    .select('id, default_payment_method_id')
+    .eq('month', mesAtual).eq('year', anoAtual);
+  const pmMap = Object.fromEntries((rawCmts||[]).map(r => [r.id, r.default_payment_method_id]));
+  commitments.forEach(c => { c.default_payment_method_id = pmMap[c.id] || null; });
+
   const { data: cf } = await sb.rpc('fin_monthly_cashflow', { p_month: mesAtual, p_year: anoAtual });
   cashflow = (cf && cf[0]) || null;
 
@@ -698,6 +704,9 @@ function buildContaCard(c) {
   const isOverdue = status === 'vencido';
   const isToday   = status === 'hoje';
 
+  const defPm     = c.default_payment_method_id ? paymentMethods.find(p => p.id===c.default_payment_method_id) : null;
+  const defPmBadge = defPm ? `<span class="badge badge-fatura" style="margin-left:6px">💳 ${esc(defPm.name)}</span>` : '';
+
   const badgeMap = {
     pago:    `<span class="badge badge-pago">✓ Pago</span>`,
     parcial: `<span class="badge badge-parcial">Parcial</span>`,
@@ -725,7 +734,7 @@ function buildContaCard(c) {
         <div class="conta-left">
           <div class="conta-name">${esc(c.name)}</div>
           <div class="conta-meta">${c.category_name ? esc(c.category_emoji||'')+ ' ' +esc(c.category_name) : ''}${c.due_day?' · Dia '+c.due_day:''}${c.type==='parcelado'&&c.installment_current?` · ${c.installment_current}/${c.installment_total}`:''}</div>
-          ${badgeMap[status]||''}
+          ${badgeMap[status]||''}${defPmBadge}
         </div>
         <div class="conta-right">
           <div class="conta-val">R$ ${fmt(plan)}</div>
@@ -785,7 +794,10 @@ function abrirPagamentoModal(id) {
       <button class="btn-save" onclick="confirmarPagamento('${esc(id)}')">Confirmar</button>
     </div>`;
   document.getElementById('modal-overlay').classList.remove('hidden');
-  setTimeout(() => document.getElementById('pay-val')?.focus(), 100);
+  setTimeout(() => {
+    document.getElementById('pay-val')?.focus();
+    if (c.default_payment_method_id) selecionarMetodo(c.default_payment_method_id);
+  }, 100);
 }
 
 function selecionarMetodo(pmId) {
@@ -833,9 +845,14 @@ async function confirmarPagamento(id) {
 function abrirEditarCommitment(id) {
   const c = commitments.find(x => x.id===id);
   if (!c) return;
-  const catOpts = categories.map(cat =>
+  const catOpts    = categories.map(cat =>
     `<option value="${esc(cat.id)}" ${cat.id===c.category_id?'selected':''}>${esc(cat.emoji||'')} ${esc(cat.name)}</option>`
   ).join('');
+  const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
+  const cardOpts   = creditCards.map(p =>
+    `<option value="${esc(p.id)}" ${p.id===c.default_payment_method_id?'selected':''}>${esc(p.name)}</option>`
+  ).join('');
+  const autoOn = !!c.default_payment_method_id;
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Editar conta</div>
@@ -856,6 +873,18 @@ function abrirEditarCommitment(id) {
         <option value="fatura" ${c.type==='fatura'?'selected':''}>Fatura</option>
       </select>
     </div>
+    <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
+        <input type="checkbox" id="edit-auto-toggle" onchange="toggleAutoCardEdit()" ${autoOn?'checked':''} style="width:18px;height:18px;accent-color:#6366f1" />
+        Cobrado direto no cartão de crédito
+      </label>
+      <div id="edit-card-row" style="display:${autoOn?'block':'none'};margin-top:12px">
+        <label style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Cartão</label>
+        <select id="edit-card" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:12px 14px;color:#f0f0f0;font-size:16px">
+          ${cardOpts || '<option value="">Nenhum cartão de crédito cadastrado</option>'}
+        </select>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
       <button class="btn-save" onclick="salvarEdicao()">Salvar</button>
@@ -863,16 +892,24 @@ function abrirEditarCommitment(id) {
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
+function toggleAutoCardEdit() {
+  const checked = document.getElementById('edit-auto-toggle')?.checked;
+  const row = document.getElementById('edit-card-row');
+  if (row) row.style.display = checked ? 'block' : 'none';
+}
+
 async function salvarEdicao() {
-  const id    = document.getElementById('edit-id').value;
-  const nome  = document.getElementById('edit-nome').value.trim();
-  const catId = document.getElementById('edit-cat').value || null;
-  const valor = parseFloat(document.getElementById('edit-valor').value);
-  const dia   = parseInt(document.getElementById('edit-dia').value) || null;
-  const tipo  = document.getElementById('edit-tipo').value;
+  const id      = document.getElementById('edit-id').value;
+  const nome    = document.getElementById('edit-nome').value.trim();
+  const catId   = document.getElementById('edit-cat').value || null;
+  const valor   = parseFloat(document.getElementById('edit-valor').value);
+  const dia     = parseInt(document.getElementById('edit-dia').value) || null;
+  const tipo    = document.getElementById('edit-tipo').value;
+  const autoOn  = document.getElementById('edit-auto-toggle')?.checked;
+  const defPmId = autoOn ? (document.getElementById('edit-card')?.value || null) : null;
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
 
-  const { error } = await sb.from('fin_commitments').update({ name:nome, category_id:catId, planned_amount:valor, due_day:dia, type:tipo }).eq('id', id);
+  const { error } = await sb.from('fin_commitments').update({ name:nome, category_id:catId, planned_amount:valor, due_day:dia, type:tipo, default_payment_method_id: defPmId }).eq('id', id);
   if (error) { showToast('Erro ao salvar: '+error.message,'error'); return; }
   fecharModal();
   await loadMes();
@@ -888,11 +925,13 @@ async function deletarCommitment(id, nome) {
 }
 
 function abrirModalNovaConta() {
-  const catOpts = categories.map(c => `<option value="${esc(c.id)}">${esc(c.emoji||'')} ${esc(c.name)}</option>`).join('');
+  const catOpts    = categories.map(c => `<option value="${esc(c.id)}">${esc(c.emoji||'')} ${esc(c.name)}</option>`).join('');
+  const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
+  const cardOpts   = creditCards.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Nova conta</div>
-    <div class="field"><label>Nome</label><input type="text" id="nc-nome" placeholder="Ex: Aluguel, Internet..." /></div>
+    <div class="field"><label>Nome</label><input type="text" id="nc-nome" placeholder="Ex: Aluguel, Netflix..." /></div>
     <div class="field"><label>Categoria</label>
       <select id="nc-cat"><option value="">— sem categoria —</option>${catOpts}</select>
     </div>
@@ -907,6 +946,18 @@ function abrirModalNovaConta() {
       <div class="field"><label>Valor (R$)</label><input type="number" id="nc-valor" step="0.01" placeholder="0,00" /></div>
       <div class="field"><label>Dia vencimento</label><input type="number" id="nc-dia" min="1" max="31" placeholder="Ex: 10" /></div>
     </div>
+    <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
+        <input type="checkbox" id="nc-auto-toggle" onchange="toggleAutoCard()" style="width:18px;height:18px;accent-color:#6366f1" />
+        Cobrado direto no cartão de crédito
+      </label>
+      <div id="nc-card-row" style="display:none;margin-top:12px">
+        <label style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Cartão</label>
+        <select id="nc-card" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:12px 14px;color:#f0f0f0;font-size:16px">
+          ${cardOpts || '<option value="">Nenhum cartão de crédito cadastrado</option>'}
+        </select>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
       <button class="btn-save" onclick="salvarNovaConta()">Salvar</button>
@@ -914,15 +965,23 @@ function abrirModalNovaConta() {
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
+function toggleAutoCard() {
+  const checked = document.getElementById('nc-auto-toggle')?.checked;
+  const row = document.getElementById('nc-card-row');
+  if (row) row.style.display = checked ? 'block' : 'none';
+}
+
 async function salvarNovaConta() {
-  const nome  = document.getElementById('nc-nome').value.trim();
-  const catId = document.getElementById('nc-cat').value || null;
-  const tipo  = document.getElementById('nc-tipo').value;
-  const valor = parseFloat(document.getElementById('nc-valor').value);
-  const dia   = parseInt(document.getElementById('nc-dia').value) || null;
+  const nome    = document.getElementById('nc-nome').value.trim();
+  const catId   = document.getElementById('nc-cat').value || null;
+  const tipo    = document.getElementById('nc-tipo').value;
+  const valor   = parseFloat(document.getElementById('nc-valor').value);
+  const dia     = parseInt(document.getElementById('nc-dia').value) || null;
+  const autoOn  = document.getElementById('nc-auto-toggle')?.checked;
+  const defPmId = autoOn ? (document.getElementById('nc-card')?.value || null) : null;
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
   try {
-    await insertCommitment({ month:mesAtual, year:anoAtual, name:nome, category_id:catId, type:tipo, planned_amount:valor, due_day:dia });
+    await insertCommitment({ month:mesAtual, year:anoAtual, name:nome, category_id:catId, type:tipo, planned_amount:valor, due_day:dia, default_payment_method_id: defPmId });
     fecharModal();
     await loadMes();
     showToast('Conta salva ✓','success');
@@ -1209,7 +1268,8 @@ async function salvarCartao() {
   if (!nome) { showToast('Informe o nome','error'); return; }
   try {
     if (pmId) {
-      await sb.from('fin_payment_methods').update({name:nome,type:tipo,billing_day:dia,color:cor}).eq('id',pmId);
+      const { error: upErr } = await sb.from('fin_payment_methods').update({name:nome,type:tipo,billing_day:dia,color:cor}).eq('id',pmId);
+      if (upErr) throw upErr;
     } else {
       await sb.from('fin_payment_methods').insert({name:nome,type:tipo,billing_day:dia,color:cor});
     }
