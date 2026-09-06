@@ -786,7 +786,10 @@ function renderPlanejamento() {
         </div>
         <div class="plan-right">
           <div class="plan-val">R$ ${fmt(c.planned_amount)}</div>
-          <button class="menu-btn" style="position:static;margin-left:4px" onclick="abrirEditarCommitment('${esc(c.id)}')">✏️</button>
+          <div style="display:flex;gap:4px">
+            <button class="menu-btn" style="position:static" onclick="abrirEditarCommitment('${esc(c.id)}')">✏️</button>
+            <button class="menu-btn" style="position:static;color:#f87171" onclick="deletarCommitment('${esc(c.id)}','${esc(c.name)}')">🗑️</button>
+          </div>
         </div>
       </div>`;
   }
