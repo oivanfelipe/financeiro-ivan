@@ -591,7 +591,24 @@ async function loadAll() {
   }
 }
 
-async function loadMes() {
+async function propagarRecorrentes() {
+  const prevM = mesAtual === 1 ? 12 : mesAtual - 1;
+  const prevA = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+  const { data: prevCmts } = await sb.from('fin_commitments')
+    .select('name, category_id, type, planned_amount, due_day, default_payment_method_id, recurrence_type')
+    .eq('month', prevM).eq('year', prevA)
+    .neq('recurrence_type', 'pontual')
+    .neq('type', 'fatura');
+  if (!prevCmts || prevCmts.length === 0) return 0;
+  const existingNames = new Set(commitments.map(c => c.name));
+  const toInsert = prevCmts.filter(c => !existingNames.has(c.name));
+  for (const c of toInsert) {
+    await insertCommitment({ month: mesAtual, year: anoAtual, name: c.name, category_id: c.category_id, type: c.type, planned_amount: c.planned_amount, due_day: c.due_day, default_payment_method_id: c.default_payment_method_id, recurrence_type: c.recurrence_type });
+  }
+  return toInsert.length;
+}
+
+async function loadMes(propagate = true) {
   document.getElementById('mes-label').textContent = mesLabel(mesAtual, anoAtual);
   dirtyTabs = new Set(['dashboard','planejamento','pagar','gastos']);
 
@@ -614,6 +631,12 @@ async function loadMes() {
     c.default_payment_method_id = pmMap[c.id] || null;
     c.recurrence_type = recMap[c.id] || 'manual';
   });
+
+  // Auto-propagate: se o mês não tem recorrentes, copia do mês anterior
+  if (propagate && commitments.filter(c => c.recurrence_type !== 'pontual').length === 0) {
+    const n = await propagarRecorrentes();
+    if (n > 0) { await loadMes(false); return; }
+  }
 
   const { data: cf } = await sb.rpc('fin_monthly_cashflow', { p_month: mesAtual, p_year: anoAtual });
   cashflow = (cf && cf[0]) || null;
