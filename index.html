@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
   <title>Orçamento Ivan v2</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
@@ -909,11 +911,13 @@ async function salvarEdicao() {
   const defPmId = autoOn ? (document.getElementById('edit-card')?.value || null) : null;
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
 
-  const { error } = await sb.from('fin_commitments').update({ name:nome, category_id:catId, planned_amount:valor, due_day:dia, type:tipo, default_payment_method_id: defPmId }).eq('id', id);
-  if (error) { showToast('Erro ao salvar: '+error.message,'error'); return; }
-  fecharModal();
-  await loadMes();
-  showToast('Conta atualizada ✓','success');
+  try {
+    const { error } = await sb.from('fin_commitments').update({ name:nome, category_id:catId, planned_amount:valor, due_day:dia, type:tipo, default_payment_method_id: defPmId }).eq('id', id);
+    if (error) throw error;
+    fecharModal();
+    await loadMes();
+    showToast('Conta atualizada ✓','success');
+  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
 }
 
 async function deletarCommitment(id, nome) {
@@ -985,7 +989,7 @@ async function salvarNovaConta() {
     fecharModal();
     await loadMes();
     showToast('Conta salva ✓','success');
-  } catch(e) { showToast('Erro: '+e.message,'error'); }
+  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
 }
 
 // === FATURAS ===
@@ -1278,7 +1282,7 @@ async function salvarCartao() {
     fecharModal();
     renderPerfil();
     showToast('Cartão salvo ✓','success');
-  } catch(e) { showToast('Erro ao salvar','error'); }
+  } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)),'error'); }
 }
 
 async function deletarCartao(id, nome) {
