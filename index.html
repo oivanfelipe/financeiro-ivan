@@ -1058,7 +1058,8 @@ async function abrirPagamentoModal(id) {
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
-      <button class="btn-save" onclick="confirmarPagamento('${esc(id)}')">Adicionar</button>
+      <button class="btn-save" onclick="confirmarPagamento('${esc(id)}', false)" style="background:#333;flex:0.6">+ Parcial</button>
+      <button class="btn-save" onclick="confirmarPagamento('${esc(id)}', true)">✓ Concluir</button>
     </div>`;
   document.getElementById('modal-overlay').classList.remove('hidden');
   setTimeout(() => {
@@ -1085,7 +1086,7 @@ function selecionarMetodo(pmId) {
   if (note) note.style.display = (el?.dataset.pmType === 'credito') ? 'block' : 'none';
 }
 
-async function confirmarPagamento(id) {
+async function confirmarPagamento(id, concluir = true) {
   const c   = commitments.find(x => x.id===id);
   const val = parseFloat(document.getElementById('pay-val')?.value);
   if (!c || !val || val <= 0) { showToast('Informe um valor válido','error'); return; }
@@ -1096,24 +1097,31 @@ async function confirmarPagamento(id) {
 
   fecharModal();
 
-  const prevPaid  = Number(c.paid);
-  c.paid          = prevPaid + val;
-  c.remaining     = Number(c.planned_amount) - c.paid;
+  const prevPaid = Number(c.paid);
+  const totalPago = prevPaid + val;
+  c.paid      = totalPago;
+  c.remaining = concluir ? 0 : Number(c.planned_amount) - totalPago;
+  if (concluir) c.planned_amount = totalPago;
   renderPagar();
   dirtyTabs.add('dashboard');
   dirtyTabs.add('pagar');
 
   try {
     await insertPayment(id, val, pmId, null, null);
+    // Se "Concluir": atualiza planned_amount para o valor real pago
+    if (concluir) {
+      await sb.from('fin_commitments').update({ planned_amount: totalPago }).eq('id', id);
+    }
     if (pmType === 'credito' && pmId) {
       const hoje = new Date().toISOString().slice(0,10);
       await insertSpending(c.category_id || null, pmId, val, c.name, hoje);
     }
     await loadMes();
-    showToast(`Pagamento de R$ ${fmt(val)} registrado ✓`, 'success');
+    showToast(`R$ ${fmt(val)} ${concluir ? 'pago e concluído ✓' : 'registrado (parcial)'}`, 'success');
   } catch(e) {
-    c.paid      = prevPaid;
-    c.remaining = Number(c.planned_amount) - prevPaid;
+    c.paid          = prevPaid;
+    c.remaining     = Number(c.planned_amount) - prevPaid;
+    c.planned_amount = Number(c.planned_amount);
     renderPagar();
     showToast('Erro ao registrar pagamento','error');
   }
