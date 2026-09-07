@@ -750,10 +750,19 @@ function renderDashboard() {
   const realClass = sobraReal >= 0 ? 'green' : 'red';
 
   const spendByCat = {};
+  // Gastos manuais lançados
   spendingSummary.forEach(s => {
     if (!spendByCat[s.category_name])
       spendByCat[s.category_name] = { spent: 0, catId: s.category_id, emoji: s.category_emoji };
     spendByCat[s.category_name].spent += Number(s.total_spent);
+  });
+  // Automáticos e parcelados (commitments com due_day null = tipo gasto, não conta a pagar)
+  commitments.filter(c => c.due_day === null).forEach(c => {
+    const cat = categories.find(x => x.id === c.category_id);
+    if (!cat) return;
+    const key = cat.name;
+    if (!spendByCat[key]) spendByCat[key] = { spent: 0, catId: cat.id, emoji: cat.emoji || '' };
+    spendByCat[key].spent += Number(c.planned_amount);
   });
 
   const catsWithBudget = categories.filter(c => getLimitForCategory(c.id) !== null);
@@ -766,7 +775,7 @@ function renderDashboard() {
     const badgeClass = pct>=100 ? 'over' : pct>=80 ? 'warn' : 'ok';
     const badgeText  = pct>=100 ? `⚠ +R$${fmt(spent-lim)}` : `${pct.toFixed(0)}%`;
     return `
-      <div class="pace-card">
+      <div class="pace-card" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(cat.id)}','${esc(cat.name)}')">
         <div class="pace-header">
           <div class="pace-name">${esc(cat.emoji||'•')} ${esc(cat.name)}</div>
           <div class="pace-badge ${badgeClass}">${badgeText}</div>
@@ -779,7 +788,7 @@ function renderDashboard() {
   const sorted = Object.entries(spendByCat).sort((a,b) => b[1].spent - a[1].spent).slice(0,5);
   const maxSpent = sorted.length ? sorted[0][1].spent : 1;
   const topHtml = sorted.map(([name, d], i) => `
-    <div class="top-row">
+    <div class="top-row" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(d.catId)}','${esc(name)}')">
       <div class="top-rank">${i+1}</div>
       <div class="top-name">${esc(d.emoji||'•')} ${esc(name)}</div>
       <div class="top-bar-wrap"><div class="top-bar" style="width:${Math.round(d.spent/maxSpent*100)}%"></div></div>
@@ -2095,6 +2104,54 @@ async function salvarTeto() {
     dirtyTabs.add('dashboard');
     showToast(valor > 0 ? 'Teto salvo ✓' : 'Teto removido', 'success');
   } catch(e) { showToast('Erro: '+(e.message||JSON.stringify(e)), 'error'); }
+}
+
+function abrirCatDrilldown(catId, catName) {
+  const cat = categories.find(c => c.id === catId);
+  const catCommitments = commitments.filter(c => c.category_id === catId && c.due_day === null);
+  const catEntries = spendingEntries.filter(e => e.category_id === catId).sort((a,b) => (b.spend_date||'').localeCompare(a.spend_date||''));
+  const totalAuto   = catCommitments.reduce((s,c) => s + Number(c.planned_amount), 0);
+  const totalManual = catEntries.reduce((s,e) => s + Number(e.amount), 0);
+  const totalCat    = totalAuto + totalManual;
+
+  const commitRowsHtml = catCommitments.length ? `
+    <div style="font-size:11px;color:#555;font-weight:600;padding:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">Comprometido</div>
+    ${catCommitments.map(c => `
+      <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #1a1a1a">
+        <span style="font-size:13px;color:#aaa">${esc(c.name)}</span>
+        <span style="font-size:13px;color:#e0e0e0;font-weight:500">R$ ${fmt(c.planned_amount)}</span>
+      </div>`).join('')}` : '';
+
+  const entryRowsHtml = catEntries.length ? `
+    <div style="font-size:11px;color:#555;font-weight:600;padding:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">Lançamentos</div>
+    ${catEntries.map(e => {
+      const pm = paymentMethods.find(p => p.id === e.payment_method_id);
+      const dl = e.spend_date ? new Date(e.spend_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '';
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1a1a1a">
+          <div>
+            <div style="font-size:13px;color:#aaa">${esc(e.subcategory||e.description||'Gasto')}</div>
+            <div style="font-size:11px;color:#555">${dl}${pm?' · '+esc(pm.name):''}</div>
+          </div>
+          <span style="font-size:13px;color:#e0e0e0;font-weight:500">R$ ${fmt(e.amount)}</span>
+        </div>`;
+    }).join('')}` : '';
+
+  const emptyHtml = !catCommitments.length && !catEntries.length
+    ? '<div style="text-align:center;color:#555;padding:24px 0;font-size:13px">Nenhum lançamento nesta categoria</div>' : '';
+
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">${esc(cat?.emoji||'•')} ${esc(catName)}</div>
+    <div style="text-align:center;padding:4px 0 14px">
+      <div style="font-size:26px;font-weight:700;color:#f0f0f0">R$ ${fmt(totalCat)}</div>
+      <div style="font-size:12px;color:#555;margin-top:2px">total no mês</div>
+    </div>
+    ${commitRowsHtml}${entryRowsHtml}${emptyHtml}
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fecharModal()">Fechar</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
 // === MODAL ===
