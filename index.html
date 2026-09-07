@@ -566,7 +566,6 @@ let paymentMethods  = [];
 let commitments     = [];
 let spendingEntries  = [];
 let spendingSummary  = [];
-let cashflow         = null;
 let categoryBudgets  = [];
 let incomeEntries    = [];
 let prevIncomeEntries = [];
@@ -703,9 +702,6 @@ async function loadMes(propagate = true) {
     if (n > 0) { await loadMes(false); return; }
   }
 
-  const { data: cf } = await sb.rpc('fin_monthly_cashflow', { p_month: mesAtual, p_year: anoAtual });
-  cashflow = (cf && cf[0]) || null;
-
   renderAtivo();
   dirtyTabs.delete(abaAtiva);
 }
@@ -741,14 +737,10 @@ async function insertPayment(commitmentId, amount, methodId, note, date) {
 // === DASHBOARD ===
 function renderDashboard() {
   const el = document.getElementById('dash-root');
-  if (!cashflow) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">📊</div>Nenhum dado para este mês</div>';
-    return;
-  }
-  const cf = cashflow;
   // Sobra Projetada: entradas do mês - total comprometido planejado
   const totalEntradas     = incomeEntries.reduce((s,e) => s + Number(e.amount), 0);
   const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
+  const totalPago         = commitments.reduce((s,c) => s + Number(c.paid || 0), 0);
   const sobraProjetada    = totalEntradas - totalComprometido;
   // Sobra Real: entradas do mês - gastos reais lançados até agora
   const totalGasto        = spendingEntries.reduce((s,e) => s + Number(e.amount), 0);
@@ -817,7 +809,7 @@ function renderDashboard() {
       <div class="kpi-card">
         <div class="kpi-label">Comprometido</div>
         <div class="kpi-value" style="font-size:20px">${fmtK(totalComprometido)}</div>
-        <div class="kpi-sub">Pago: R$ ${fmt(cf.commitments_paid)}</div>
+        <div class="kpi-sub">Pago: R$ ${fmt(totalPago)}</div>
       </div>
     </div>
     <div class="kpi-grid" style="margin-top:8px">
