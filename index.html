@@ -287,13 +287,6 @@
     .fatura-total-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 0; margin-top: 8px; border-top: 1px solid #333; font-size: 13px; color: #aaa; }
     .fatura-cat-name { color: #888; }
     .fatura-cat-val  { color: #ccc; font-weight: 500; }
-    .btn-gen-fatura {
-      width: 100%; background: #1a1a2a; border: 1px solid #2a2a3a;
-      color: #818cf8; border-radius: 10px; padding: 12px; font-size: 13px;
-      cursor: pointer; margin-top: 10px; min-height: 44px;
-    }
-    .btn-gen-fatura:hover { background: #222; }
-
     /* Gastos */
     .gastos-form {
       background: #141414; border: 1px solid #1e1e1e; border-radius: 14px;
@@ -753,14 +746,14 @@ function renderDashboard() {
     return;
   }
   const cf = cashflow;
-  // Sobra Projetada: entradas cadastradas (chegarão no mês seguinte) - total comprometido
-  const totalEntradas    = incomeEntries.reduce((s,e) => s + Number(e.amount), 0);
+  // Sobra Projetada: entradas do mês - total comprometido planejado
+  const totalEntradas     = incomeEntries.reduce((s,e) => s + Number(e.amount), 0);
   const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
-  const sobraProjetada   = totalEntradas - totalComprometido;
-  // Sobra Real: entradas do mês anterior (chegaram este mês) - gastos reais até agora
-  const totalPrevEntradas = prevIncomeEntries.reduce((s,e) => s + Number(e.amount), 0);
+  const sobraProjetada    = totalEntradas - totalComprometido;
+  // Sobra Real: entradas do mês - gastos reais lançados até agora
   const totalGasto        = spendingEntries.reduce((s,e) => s + Number(e.amount), 0);
-  const sobraReal         = totalPrevEntradas - totalGasto;
+  const sobraReal         = totalEntradas - totalGasto;
+  const totalPrevEntradas = prevIncomeEntries.reduce((s,e) => s + Number(e.amount), 0);
   const projClass = sobraProjetada >= 0 ? 'green' : 'red';
   const realClass = sobraReal >= 0 ? 'green' : 'red';
 
@@ -836,7 +829,7 @@ function renderDashboard() {
       <div class="kpi-card highlight">
         <div class="kpi-label">Sobra Real</div>
         <div class="kpi-value ${realClass}">R$ ${fmt(sobraReal)}</div>
-        <div class="kpi-sub">Rec. mês ant. − Gasto real</div>
+        <div class="kpi-sub">Entradas − Gasto real até agora</div>
       </div>
     </div>
 
@@ -1518,7 +1511,6 @@ function renderFaturas() {
     const total        = manualTotal + autoTotal;
     if (!total) return '';
     const vencLabel = card.billing_day ? `vence dia ${card.billing_day}/${MESES[proxMes-1].slice(0,3)}` : MESES[proxMes-1];
-    const faturaExiste = commitments.some(c => c.type==='fatura' && c.fatura_card_id===card.id && c.month===proxMes && c.year===proxAno);
     const autoRowsHtml = autoItems.map(c => `
       <div class="fatura-cat-row">
         <span class="fatura-cat-name">🤖 ${esc(c.name)}</span>
@@ -1557,23 +1549,6 @@ function renderFaturas() {
     </div>
     ${faturaHtml || '<div class="empty-state"><div class="icon">💳</div>Nenhum gasto no cartão de crédito este mês<br><small style="margin-top:8px;display:block">Registre gastos na aba Gastos usando o cartão</small></div>'}
   `;
-}
-
-async function gerarFatura(cardId, total, proxMes, proxAno) {
-  const card = paymentMethods.find(p => p.id===cardId);
-  try {
-    await insertCommitment({
-      month: proxMes, year: proxAno,
-      name: `Fatura ${card?.name||'Cartão'}`,
-      type: 'fatura', planned_amount: total,
-      due_day: card?.billing_day || null,
-      fatura_card_id: cardId,
-      fatura_reference_month: mesAtual,
-      fatura_reference_year: anoAtual
-    });
-    showToast(`Fatura de ${MESES[proxMes-1]} gerada ✓`, 'success');
-    await loadMes();
-  } catch(e) { showToast('Erro ao gerar fatura','error'); }
 }
 
 // === GASTOS ===
