@@ -424,10 +424,28 @@
     .emoji-opt { font-size: 20px; cursor: pointer; padding: 4px; border-radius: 6px; border: 1px solid transparent; }
     .emoji-opt:hover { border-color: #6366f1; background: #1e1e2e; }
     .emoji-opt.sel { border-color: #6366f1; background: #1e1e2e; }
-    .perfil-renda {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    /* Income section */
+    .income-section {
+      background: #111; border: 1px solid #1e1e1e; border-radius: 14px;
+      padding: 14px 16px; margin-bottom: 16px;
     }
-    .perfil-renda input { flex: 1; }
+    .income-section-header {
+      display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px;
+    }
+    .income-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid #1a1a1a;
+    }
+    .income-item:last-child { border-bottom: none; }
+    .income-info { flex: 1; }
+    .income-desc { font-size: 14px; color: #e0e0e0; }
+    .income-date { font-size: 11px; color: #555; margin-top: 2px; }
+    .income-val { font-size: 14px; font-weight: 700; color: #4ade80; white-space: nowrap; }
+    .income-total-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0 0; border-top: 1px solid #1e1e1e; margin-top: 8px;
+      font-size: 13px; color: #aaa;
+    }
 
     /* Modal (bottom sheet) */
     .modal-overlay {
@@ -552,10 +570,12 @@ let dirtyTabs       = new Set();
 let categories      = [];
 let paymentMethods  = [];
 let commitments     = [];
-let spendingEntries = [];
-let spendingSummary = [];
-let cashflow        = null;
-let categoryBudgets = [];
+let spendingEntries  = [];
+let spendingSummary  = [];
+let cashflow         = null;
+let categoryBudgets  = [];
+let incomeEntries    = [];
+let prevIncomeEntries = [];
 let ultimaAcaoParams = null;
 let filtroGastosCat  = null;
 
@@ -650,15 +670,22 @@ async function loadMes(propagate = true) {
   document.getElementById('mes-label').textContent = mesLabel(mesAtual, anoAtual);
   dirtyTabs = new Set(['dashboard','planejamento','pagar','gastos','faturas']);
 
-  const [cmts, spend, spSum] = await Promise.all([
+  const prevM = mesAtual === 1 ? 12 : mesAtual - 1;
+  const prevA = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+
+  const [cmts, spend, spSum, inc, incPrev] = await Promise.all([
     sb.from('fin_commitment_summary').select('*').eq('month', mesAtual).eq('year', anoAtual).order('due_day'),
     sb.from('fin_spending_entries').select('*').eq('month', mesAtual).eq('year', anoAtual).order('spend_date', {ascending:false}),
-    sb.from('fin_spending_summary').select('*').eq('month', mesAtual).eq('year', anoAtual)
+    sb.from('fin_spending_summary').select('*').eq('month', mesAtual).eq('year', anoAtual),
+    sb.from('fin_income_entries').select('*').eq('month', mesAtual).eq('year', anoAtual).order('entry_date'),
+    sb.from('fin_income_entries').select('*').eq('month', prevM).eq('year', prevA).order('entry_date')
   ]);
 
-  commitments     = cmts.data  || [];
-  spendingEntries = spend.data || [];
-  spendingSummary = spSum.data || [];
+  commitments      = cmts.data    || [];
+  spendingEntries  = spend.data   || [];
+  spendingSummary  = spSum.data   || [];
+  incomeEntries    = inc.data     || [];
+  prevIncomeEntries = incPrev.data || [];
 
   const { data: rawCmts } = await sb.from('fin_commitments')
     .select('id, default_payment_method_id, recurrence_type')
@@ -836,6 +863,22 @@ function renderPlanejamento() {
   const manualHtml  = manuais.map(buildPlanCard).join('');
   const pontualHtml = pontuais.map(buildPlanCard).join('');
 
+  const proxM = mesAtual === 12 ? 1 : mesAtual + 1;
+  const proxA = mesAtual === 12 ? anoAtual + 1 : anoAtual;
+  const totalEntradas = incomeEntries.reduce((s, e) => s + Number(e.amount), 0);
+  const sobra = totalEntradas - totalComprometido;
+  const sobraClass = sobra >= 0 ? 'green' : 'red';
+
+  const incomeHtml = incomeEntries.map(e => `
+    <div class="income-item">
+      <div class="income-info">
+        <div class="income-desc">${esc(e.description || 'Entrada')}</div>
+        <div class="income-date">${e.entry_date ? new Date(e.entry_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : 'Sem data'}</div>
+      </div>
+      <div class="income-val">R$ ${fmt(e.amount)}</div>
+      <button class="gasto-del" onclick="deletarIncomeEntry('${esc(e.id)}')">🗑</button>
+    </div>`).join('');
+
   el.innerHTML = `
     <div class="plan-header">
       <div class="plan-title">Planejamento</div>
@@ -844,6 +887,27 @@ function renderPlanejamento() {
         <button class="btn-nova" onclick="abrirModalNovaConta()">+ Nova</button>
       </div>
     </div>
+
+    <div class="income-section">
+      <div class="income-section-header">
+        <div>
+          <span style="font-weight:700">💰 Entradas de ${MESES[mesAtual-1]}</span>
+          <div style="font-size:11px;color:#555;margin-top:2px">Valor que cai em ${MESES[proxM-1]} ${proxA !== anoAtual ? proxA : ''}</div>
+        </div>
+        <button class="btn-nova" style="font-size:12px;padding:8px 14px" onclick="abrirIncomeModal()">+ Adicionar</button>
+      </div>
+      ${incomeHtml || '<div style="font-size:12px;color:#444;padding:8px 0">Nenhuma entrada cadastrada</div>'}
+      ${incomeEntries.length > 0 ? `
+        <div class="income-total-row">
+          <span>Total entradas</span>
+          <span style="font-weight:700;color:#4ade80">R$ ${fmt(totalEntradas)}</span>
+        </div>
+        <div class="income-total-row" style="border-top:none;padding-top:0">
+          <span>Sobra projetada</span>
+          <span style="font-weight:700" class="${sobraClass}">R$ ${fmt(sobra)}</span>
+        </div>` : ''}
+    </div>
+
     <div class="contas-summary">
       <div class="cs-card"><div class="cs-label">Comprometido</div><div class="cs-val red">R$ ${fmt(totalComprometido)}</div></div>
       <div class="cs-card"><div class="cs-label">Itens</div><div class="cs-val green">${commitments.length}</div></div>
@@ -1417,11 +1481,22 @@ function renderFaturas() {
   const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
 
   const faturaHtml = creditCards.map(card => {
-    const cardEntries = spendingSummary.filter(s => s.card_id===card.id);
-    const total = cardEntries.reduce((s,x) => s+Number(x.total_spent), 0);
+    const cardEntries  = spendingSummary.filter(s => s.card_id===card.id);
+    const autoItems    = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
+    const manualTotal  = cardEntries.reduce((s,x) => s+Number(x.total_spent), 0);
+    const autoTotal    = autoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
+    const total        = manualTotal + autoTotal;
     if (!total) return '';
     const vencLabel = card.billing_day ? `vence dia ${card.billing_day}/${MESES[proxMes-1].slice(0,3)}` : MESES[proxMes-1];
     const faturaExiste = commitments.some(c => c.type==='fatura' && c.fatura_card_id===card.id && c.month===proxMes && c.year===proxAno);
+    const autoRowsHtml = autoItems.map(c => `
+      <div class="fatura-cat-row">
+        <span class="fatura-cat-name">🤖 ${esc(c.name)}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="fatura-cat-val">R$ ${fmt(c.planned_amount)}</span>
+          <button class="btn-card-act" style="font-size:13px" onclick="editarAutomatico('${esc(c.id)}','${esc(c.name)}',${Number(c.planned_amount)})">✏️</button>
+        </div>
+      </div>`).join('');
     return `
       <div class="fatura-card">
         <div class="fatura-header">
@@ -1432,6 +1507,8 @@ function renderFaturas() {
           <div class="fatura-total">R$ ${fmt(total)}</div>
         </div>
         <div class="fatura-sub">Consumo de ${mesLabel(mesAtual,anoAtual)} · ${vencLabel}</div>
+        ${autoItems.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Automáticos</div>${autoRowsHtml}` : ''}
+        ${cardEntries.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Gastos manuais por categoria</div>` : ''}
         ${cardEntries.sort((a,b)=>Number(b.total_spent)-Number(a.total_spent)).map(s=>`
           <div class="fatura-cat-row">
             <span class="fatura-cat-name">${esc(s.category_emoji||'•')} ${esc(s.category_name)}</span>
@@ -1654,11 +1731,6 @@ function renderPerfil() {
       <div class="field"><label>Nome</label>
         <input type="text" id="p-nome" value="${esc(p.nome||'')}" placeholder="Seu nome" />
       </div>
-      <div class="field"><label>💰 Renda mensal (R$)</label>
-        <div class="perfil-renda">
-          <input type="text" id="p-renda" value="${p.rendaMensal ? fmt(p.rendaMensal) : ''}" inputmode="decimal" placeholder="Ex: 5.000,00" />
-        </div>
-      </div>
       <div class="field"><label>📅 Dia de recebimento</label>
         <input type="number" id="p-dia" value="${p.diaRecebimento||''}" min="1" max="31" placeholder="Ex: 30" />
       </div>
@@ -1690,14 +1762,86 @@ function carregarPerfil() {
 }
 
 function salvarPerfil() {
-  const nome  = document.getElementById('p-nome')?.value?.trim() || '';
-  const dia   = parseInt(document.getElementById('p-dia')?.value) || null;
-  const rendaRaw = (document.getElementById('p-renda')?.value || '').replace(/\./g,'').replace(',','.');
-  const renda = parseFloat(rendaRaw) || null;
+  const nome = document.getElementById('p-nome')?.value?.trim() || '';
+  const dia  = parseInt(document.getElementById('p-dia')?.value) || null;
   const p = carregarPerfil();
-  p.nome = nome; p.diaRecebimento = dia; p.rendaMensal = renda;
+  p.nome = nome; p.diaRecebimento = dia;
   localStorage.setItem('oiv2_perfil', JSON.stringify(p));
   showToast('Perfil salvo ✓','success');
+}
+
+// === ENTRADAS DE DINHEIRO ===
+function abrirIncomeModal() {
+  const hoje = new Date().toISOString().slice(0,10);
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nova entrada</div>
+    <div style="font-size:12px;color:#6366f1;margin-bottom:12px">💡 Entrada de ${MESES[mesAtual-1]} = dinheiro que cai em ${MESES[mesAtual===12?0:mesAtual]}</div>
+    <div class="field"><label>Valor (R$)</label>
+      <input type="number" id="inc-valor" placeholder="0,00" min="0" step="0.01" inputmode="decimal" />
+    </div>
+    <div class="field"><label>Descrição</label>
+      <input type="text" id="inc-desc" placeholder="Ex: Salário, Freelance..." />
+    </div>
+    <div class="field"><label>Data prevista</label>
+      <input type="date" id="inc-data" value="${hoje}" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarIncomeEntry()">Salvar</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('inc-valor')?.focus(), 100);
+}
+
+async function salvarIncomeEntry() {
+  const valor = parseFloat(document.getElementById('inc-valor')?.value) || 0;
+  if (valor <= 0) { showToast('Informe um valor válido','error'); return; }
+  const desc = document.getElementById('inc-desc')?.value?.trim() || null;
+  const data = document.getElementById('inc-data')?.value || null;
+  const { error } = await sb.from('fin_income_entries').insert({
+    month: mesAtual, year: anoAtual, amount: valor, description: desc, entry_date: data
+  });
+  if (error) { showToast('Erro ao salvar entrada','error'); return; }
+  fecharModal();
+  await loadMes();
+  showToast('Entrada salva ✓','success');
+}
+
+async function deletarIncomeEntry(id) {
+  if (!confirm('Remover esta entrada?')) return;
+  const { error } = await sb.from('fin_income_entries').delete().eq('id', id);
+  if (error) { showToast('Erro ao remover','error'); return; }
+  await loadMes();
+  showToast('Entrada removida','success');
+}
+
+// === EDITAR AUTOMÁTICO (FATURAS) ===
+function editarAutomatico(id, nome, valorAtual) {
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar automático</div>
+    <div style="font-size:13px;color:#aaa;margin-bottom:12px">${esc(nome)}</div>
+    <div class="field"><label>Valor (R$)</label>
+      <input type="number" id="auto-valor" value="${valorAtual}" min="0" step="0.01" inputmode="decimal" />
+    </div>
+    <div style="font-size:11px;color:#555;margin-top:4px">A alteração vale a partir deste mês e será propagada adiante.</div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarAutomatico('${esc(id)}')">Salvar</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('auto-valor')?.focus(), 100);
+}
+
+async function salvarAutomatico(id) {
+  const valor = parseFloat(document.getElementById('auto-valor')?.value);
+  if (!valor || valor <= 0) { showToast('Valor inválido','error'); return; }
+  const { error } = await sb.from('fin_commitments').update({ planned_amount: valor }).eq('id', id);
+  if (error) { showToast('Erro ao atualizar','error'); return; }
+  fecharModal();
+  await loadMes();
+  showToast('Valor atualizado ✓','success');
 }
 
 // === CRUD CATEGORIAS ===
