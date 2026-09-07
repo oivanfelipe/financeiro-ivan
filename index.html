@@ -284,6 +284,7 @@
     .fatura-total { font-size: 20px; font-weight: 700; color: #fff; }
     .fatura-sub { font-size: 12px; color: #555; margin-bottom: 10px; }
     .fatura-cat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-top: 1px solid #1e1e1e; }
+    .fatura-total-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 0; margin-top: 8px; border-top: 1px solid #333; font-size: 13px; color: #aaa; }
     .fatura-cat-name { color: #888; }
     .fatura-cat-val  { color: #ccc; font-weight: 500; }
     .btn-gen-fatura {
@@ -604,10 +605,16 @@ function statusConta(item, venc) {
   if (item.paid > 0) return 'parcial';
   if (item.type === 'fatura') return 'fatura';
   if (!venc) return 'futuro';
-  const hoje = new Date().getDate();
-  if (venc < hoje) return 'vencido';
-  if (venc === hoje) return 'hoje';
-  if (venc - hoje <= 3) return 'semana';
+  const agora = new Date();
+  const mesHoje = agora.getMonth() + 1;
+  const anoHoje = agora.getFullYear();
+  // Mês passado: tudo vencido. Mês futuro: tudo futuro. Só compara dia no mês atual.
+  if (anoAtual < anoHoje || (anoAtual === anoHoje && mesAtual < mesHoje)) return 'vencido';
+  if (anoAtual > anoHoje || (anoAtual === anoHoje && mesAtual > mesHoje)) return 'futuro';
+  const diaHoje = agora.getDate();
+  if (venc < diaHoje) return 'vencido';
+  if (venc === diaHoje) return 'hoje';
+  if (venc - diaHoje <= 3) return 'semana';
   return 'futuro';
 }
 
@@ -746,8 +753,16 @@ function renderDashboard() {
     return;
   }
   const cf = cashflow;
-  const sobra = Number(cf.surplus_expected);
-  const sobraClass = sobra >= 0 ? 'green' : 'red';
+  // Sobra Projetada: entradas cadastradas (chegarão no mês seguinte) - total comprometido
+  const totalEntradas    = incomeEntries.reduce((s,e) => s + Number(e.amount), 0);
+  const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
+  const sobraProjetada   = totalEntradas - totalComprometido;
+  // Sobra Real: entradas do mês anterior (chegaram este mês) - gastos reais até agora
+  const totalPrevEntradas = prevIncomeEntries.reduce((s,e) => s + Number(e.amount), 0);
+  const totalGasto        = spendingEntries.reduce((s,e) => s + Number(e.amount), 0);
+  const sobraReal         = totalPrevEntradas - totalGasto;
+  const projClass = sobraProjetada >= 0 ? 'green' : 'red';
+  const realClass = sobraReal >= 0 ? 'green' : 'red';
 
   const spendByCat = {};
   spendingSummary.forEach(s => {
@@ -802,20 +817,27 @@ function renderDashboard() {
     <div class="sec-title">Resumo do mês</div>
     <div class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-label">Disponível</div>
-        <div class="kpi-value" style="font-size:20px">R$ ${fmt(cf.income_received)}</div>
-        <div class="kpi-sub">Previsto: R$ ${fmt(cf.income_expected)}</div>
+        <div class="kpi-label">Entradas previstas</div>
+        <div class="kpi-value" style="font-size:20px">R$ ${fmt(totalEntradas)}</div>
+        <div class="kpi-sub">Mês anterior: R$ ${fmt(totalPrevEntradas)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Comprometido</div>
-        <div class="kpi-value" style="font-size:20px">${fmtK(cf.commitments_total)}</div>
+        <div class="kpi-value" style="font-size:20px">${fmtK(totalComprometido)}</div>
         <div class="kpi-sub">Pago: R$ ${fmt(cf.commitments_paid)}</div>
       </div>
     </div>
-    <div class="kpi-card highlight">
-      <div class="kpi-label">Sobra prevista</div>
-      <div class="kpi-value ${sobraClass}">R$ ${fmt(sobra)}</div>
-      <div class="kpi-sub">Real até agora: R$ ${fmt(cf.surplus_actual)}</div>
+    <div class="kpi-grid" style="margin-top:8px">
+      <div class="kpi-card highlight">
+        <div class="kpi-label">Sobra Projetada</div>
+        <div class="kpi-value ${projClass}">R$ ${fmt(sobraProjetada)}</div>
+        <div class="kpi-sub">Entradas − Comprometido</div>
+      </div>
+      <div class="kpi-card highlight">
+        <div class="kpi-label">Sobra Real</div>
+        <div class="kpi-value ${realClass}">R$ ${fmt(sobraReal)}</div>
+        <div class="kpi-sub">Rec. mês ant. − Gasto real</div>
+      </div>
     </div>
 
     ${catsWithBudget.length > 0 ? `<div class="sec-title">Pace por categoria</div>${paceHtml}` : ''}
@@ -1522,9 +1544,10 @@ function renderFaturas() {
             <span class="fatura-cat-name">${esc(s.category_emoji||'•')} ${esc(s.category_name)}</span>
             <span class="fatura-cat-val">R$ ${fmt(s.total_spent)}</span>
           </div>`).join('')}
-        ${!faturaExiste && total > 0
-          ? `<button class="btn-gen-fatura" onclick="gerarFatura('${esc(card.id)}',${total},${proxMes},${proxAno})">+ Gerar fatura de ${MESES[proxMes-1]} (R$ ${fmt(total)})</button>`
-          : `<div style="font-size:12px;color:#555;text-align:center;margin-top:10px">✓ Fatura de ${MESES[proxMes-1]} já gerada</div>`}
+        <div class="fatura-total-row">
+          <span>Total da fatura</span>
+          <span style="font-weight:700;color:#f0f0f0">R$ ${fmt(total)}</span>
+        </div>
       </div>`;
   }).filter(Boolean).join('');
 
