@@ -348,6 +348,27 @@
     }
     .gasto-del:hover { color: #f87171; background: #1a1a1a; }
 
+    /* Tetos de gasto */
+    .teto-card { background:#141414; border:1px solid #1e1e1e; border-radius:12px; padding:13px 14px; margin-bottom:8px; }
+    .teto-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .teto-cat { display:flex; align-items:center; gap:8px; }
+    .teto-emoji { font-size:20px; }
+    .teto-name { font-size:14px; font-weight:600; color:#e0e0e0; }
+    .teto-vals { font-size:13px; white-space:nowrap; }
+    .teto-spent { font-weight:700; color:#e0e0e0; }
+    .teto-spent.red { color:#f87171; }
+    .teto-budget { color:#555; }
+    .teto-bar { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .teto-bar .progress-bar { flex:1; }
+    .teto-pct { font-size:11px; color:#555; min-width:30px; text-align:right; }
+    .teto-expand-btn { width:100%; background:none; border:none; color:#6366f1; font-size:12px; cursor:pointer; padding:4px 0; text-align:left; }
+    .teto-entries { padding-top:8px; border-top:1px solid #1a1a1a; margin-top:4px; display:none; }
+    .teto-entry { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #111; font-size:13px; }
+    .teto-entry:last-child { border-bottom:none; }
+    .teto-entry-desc { color:#ccc; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .teto-entry-date { color:#555; font-size:11px; white-space:nowrap; margin:0 8px; }
+    .teto-entry-val { color:#e0e0e0; font-weight:600; white-space:nowrap; }
+
     /* Perfil */
     .perfil-avatar {
       width: 64px; height: 64px; background: #1e1e2e; border: 2px solid #6366f1;
@@ -801,7 +822,10 @@ function renderPlanejamento() {
   el.innerHTML = `
     <div class="plan-header">
       <div class="plan-title">Planejamento</div>
-      <button class="btn-nova" onclick="abrirModalNovaConta()">+ Nova</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-nova" style="background:#1a1a1a;color:#555;font-size:12px" onclick="limparDuplicados()">🧹 Dupl.</button>
+        <button class="btn-nova" onclick="abrirModalNovaConta()">+ Nova</button>
+      </div>
     </div>
     <div class="contas-summary">
       <div class="cs-card"><div class="cs-label">Comprometido</div><div class="cs-val red">R$ ${fmt(totalComprometido)}</div></div>
@@ -1154,6 +1178,27 @@ async function deletarCommitment(id, nome) {
   showToast('Conta removida ✓','success');
 }
 
+async function limparDuplicados() {
+  const grouped = {};
+  commitments.forEach(c => {
+    const key = c.name.trim().toLowerCase();
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(c);
+  });
+  let deleted = 0;
+  for (const key in grouped) {
+    const dupes = grouped[key];
+    if (dupes.length <= 1) continue;
+    // Mantém o primeiro (menor índice = inserido primeiro), apaga o resto
+    for (let i = 1; i < dupes.length; i++) {
+      const { error } = await sb.from('fin_commitments').delete().eq('id', dupes[i].id);
+      if (!error) deleted++;
+    }
+  }
+  await loadMes();
+  showToast(deleted > 0 ? `${deleted} duplicado(s) removido(s) ✓` : 'Nenhum duplicado encontrado', deleted > 0 ? 'success' : 'success');
+}
+
 function abrirModalNovaConta() {
   const catOpts    = categories.map(c => `<option value="${esc(c.id)}">${esc(c.emoji||'')} ${esc(c.name)}</option>`).join('');
   const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
@@ -1319,8 +1364,8 @@ async function salvarNovaConta() {
 function renderPagar() {
   const el = document.getElementById('pagar-root');
 
-  // Somente contas manuais e pontuais (não automáticas)
-  const pagarCmts = commitments.filter(c => c.recurrence_type !== 'automatico');
+  // Somente contas COM data de vencimento (com due_day = é uma conta a pagar)
+  const pagarCmts = commitments.filter(c => c.due_day != null);
 
   const totalFaltante = pagarCmts.reduce((s,c) => s + Math.max(Number(c.remaining),0), 0);
   const qtdQuitadas   = pagarCmts.filter(c => Number(c.remaining) <= 0.005).length;
@@ -1404,6 +1449,50 @@ function renderGastos() {
   const totalGasto = spendingEntries.reduce((s,e) => s+Number(e.amount), 0);
   const hoje = new Date().toISOString().slice(0,10);
 
+  // Tetos: commitments SEM due_day = orçamento por categoria
+  const tetos = commitments.filter(c => !c.due_day);
+  const spentByCat = {};
+  spendingEntries.forEach(e => {
+    if (!e.category_id) return;
+    spentByCat[e.category_id] = (spentByCat[e.category_id] || 0) + Number(e.amount);
+  });
+
+  const tetosHtml = tetos.length ? tetos.map(t => {
+    const cat    = categories.find(c => c.id === t.category_id);
+    const budget = Number(t.planned_amount);
+    const spent  = spentByCat[t.category_id] || 0;
+    const pct    = budget > 0 ? Math.min(100, Math.round(spent/budget*100)) : 0;
+    const barClass = pct >= 100 ? 'red' : pct >= 80 ? 'yellow' : 'green';
+    const catEntries = spendingEntries.filter(e => e.category_id === t.category_id)
+      .sort((a,b) => (b.spend_date||'').localeCompare(a.spend_date||''));
+    const entriesHtml = catEntries.length ? catEntries.map(e => `
+      <div class="teto-entry">
+        <span class="teto-entry-desc">${esc(e.description||'Gasto')}</span>
+        <span class="teto-entry-date">${e.spend_date ? new Date(e.spend_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : ''}</span>
+        <span class="teto-entry-val">R$${fmt(e.amount)}</span>
+      </div>`).join('') : '<div style="font-size:12px;color:#555;padding:6px 0">Nenhum gasto nesta categoria</div>';
+    return `
+      <div class="teto-card">
+        <div class="teto-header">
+          <div class="teto-cat">
+            <span class="teto-emoji">${esc(cat?.emoji||'📦')}</span>
+            <span class="teto-name">${esc(cat?.name||t.name)}</span>
+          </div>
+          <div class="teto-vals">
+            <span class="teto-spent ${pct>=100?'red':''}">R$${fmt(spent)}</span>
+            <span class="teto-budget"> / R$${fmt(budget)}</span>
+          </div>
+        </div>
+        <div class="teto-bar">
+          <div class="progress-bar"><div class="progress-fill ${barClass}" style="width:${pct}%"></div></div>
+          <span class="teto-pct">${pct}%</span>
+        </div>
+        <button class="teto-expand-btn" onclick="toggleTeto('${esc(t.id)}')">▼ Ver lançamentos (${catEntries.length})</button>
+        <div class="teto-entries" id="teto-${esc(t.id)}">${entriesHtml}</div>
+      </div>`;
+  }).join('') : '';
+
+  // Lançamentos avulsos (gastos sem teto correspondente ou de categorias sem teto)
   const byDay = {};
   spendingEntries.forEach(e => {
     const d = e.spend_date ? e.spend_date.slice(0,10) : 'sem-data';
@@ -1429,7 +1518,7 @@ function renderGastos() {
         </div>`;
     }).join('');
     return `<div class="gastos-group-day"><div class="gastos-day-label">${label}</div>${items}</div>`;
-  }).join('') : `<div class="empty-state"><div class="icon">💸</div>Nenhum gasto registrado neste mês</div>`;
+  }).join('') : '';
 
   el.innerHTML = `
     <div class="gastos-form">
@@ -1454,8 +1543,18 @@ function renderGastos() {
       <div class="gr-card"><div class="gr-label">Total do mês</div><div class="gr-val red">R$${fmt(totalGasto)}</div></div>
       <div class="gr-card"><div class="gr-label">Lançamentos</div><div class="gr-val">${spendingEntries.length}</div></div>
     </div>
-    ${listaHtml}
+    ${tetosHtml ? `<div class="sec-title" style="margin-bottom:8px">🎯 Tetos por categoria</div>${tetosHtml}` : ''}
+    ${listaHtml ? `<div class="sec-title" style="margin-bottom:8px;margin-top:${tetosHtml?'16px':'0'}">📋 Todos os lançamentos</div>${listaHtml}` : (!tetosHtml ? `<div class="empty-state"><div class="icon">💸</div>Nenhum gasto registrado neste mês</div>` : '')}
   `;
+}
+
+function toggleTeto(id) {
+  const el = document.getElementById(`teto-${id}`);
+  if (!el) return;
+  const btn = el.previousElementSibling;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = (open ? '▼' : '▲') + btn.textContent.slice(1);
 }
 
 async function addGasto() {
