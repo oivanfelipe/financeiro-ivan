@@ -1497,10 +1497,12 @@ function renderFaturas() {
 
   const faturaHtml = creditCards.map(card => {
     const cardEntries  = spendingSummary.filter(s => s.card_id===card.id);
-    const autoItems    = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
-    const manualTotal  = cardEntries.reduce((s,x) => s+Number(x.total_spent), 0);
-    const autoTotal    = autoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
-    const total        = manualTotal + autoTotal;
+    const autoItems      = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
+    const parceladoItems = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null);
+    const manualTotal    = cardEntries.reduce((s,x) => s+Number(x.total_spent), 0);
+    const autoTotal      = autoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
+    const parceladoTotal = parceladoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
+    const total          = manualTotal + autoTotal + parceladoTotal;
     if (!total) return '';
     const vencLabel = card.billing_day ? `vence dia ${card.billing_day}/${MESES[proxMes-1].slice(0,3)}` : MESES[proxMes-1];
     const autoRowsHtml = autoItems.map(c => `
@@ -1510,6 +1512,11 @@ function renderFaturas() {
           <span class="fatura-cat-val">R$ ${fmt(c.planned_amount)}</span>
           <button class="btn-card-act" style="font-size:13px" onclick="editarAutomatico('${esc(c.id)}','${esc(c.name)}',${Number(c.planned_amount)})">✏️</button>
         </div>
+      </div>`).join('');
+    const parceladoRowsHtml = parceladoItems.map(c => `
+      <div class="fatura-cat-row">
+        <span class="fatura-cat-name">💳 ${esc(c.name)}</span>
+        <span class="fatura-cat-val">R$ ${fmt(c.planned_amount)}</span>
       </div>`).join('');
     return `
       <div class="fatura-card">
@@ -1522,6 +1529,7 @@ function renderFaturas() {
         </div>
         <div class="fatura-sub">Consumo de ${mesLabel(mesAtual,anoAtual)} · ${vencLabel}</div>
         ${autoItems.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Automáticos</div>${autoRowsHtml}` : ''}
+        ${parceladoItems.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Parceladas</div>${parceladoRowsHtml}` : ''}
         ${cardEntries.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Gastos manuais por categoria</div>` : ''}
         ${cardEntries.sort((a,b)=>Number(b.total_spent)-Number(a.total_spent)).map(s=>`
           <div class="fatura-cat-row">
@@ -1582,7 +1590,7 @@ function renderGastos() {
       <div class="gastos-form-title">Registrar gasto</div>
       <div class="field-row">
         <div class="field"><label>Valor (R$)</label>
-          <input type="number" id="g-valor" placeholder="0,00" min="0" step="0.01" inputmode="decimal" />
+          <input type="number" id="g-valor" placeholder="0,00" min="0" step="0.01" inputmode="decimal" oninput="atualizarParcPreview()" />
         </div>
         <div class="field"><label>Categoria</label>
           <select id="g-cat" onchange="atualizarSubcatList()">${catOpts}</select>
@@ -1601,7 +1609,23 @@ function renderGastos() {
         <label>Observação (opcional)</label>
         <input type="text" id="g-desc" placeholder="Detalhes adicionais..." />
       </div>
-      <button class="btn-registrar" onclick="addGasto()">+ Registrar gasto</button>
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 0 2px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#888;font-size:13px;user-select:none">
+          <input type="checkbox" id="toggle-parc" onchange="toggleParc()" style="width:16px;height:16px;accent-color:#818cf8;cursor:pointer" />
+          💳 Parcelado?
+        </label>
+      </div>
+      <div id="parc-opts" style="display:none">
+        <div class="field-row">
+          <div class="field"><label>Nº de parcelas</label>
+            <input type="number" id="g-parcelas" value="2" min="2" max="48" oninput="atualizarParcPreview()" />
+          </div>
+          <div class="field" style="justify-content:flex-end;align-items:flex-end">
+            <div id="parc-preview" style="color:#818cf8;font-size:12px;padding-bottom:10px;text-align:right"></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-registrar" id="btn-gasto" onclick="submitGasto()">+ Registrar gasto</button>
     </div>
     <div class="gastos-resumo">
       <div class="gr-card"><div class="gr-label">Total do mês</div><div class="gr-val red">R$${fmt(totalGasto)}</div></div>
@@ -1645,6 +1669,56 @@ async function addGasto() {
   document.getElementById('g-subcat').value = '';
   document.getElementById('g-desc').value   = '';
   showToast('Gasto registrado ✓','success');
+}
+
+function toggleParc() {
+  const checked = document.getElementById('toggle-parc')?.checked;
+  const opts = document.getElementById('parc-opts');
+  const btn  = document.getElementById('btn-gasto');
+  if (opts) opts.style.display = checked ? 'block' : 'none';
+  if (btn)  btn.textContent   = checked ? '💳 Lançar parcelado' : '+ Registrar gasto';
+  if (checked) atualizarParcPreview();
+}
+
+function atualizarParcPreview() {
+  const valor = parseFloat(document.getElementById('g-valor')?.value) || 0;
+  const n     = parseInt(document.getElementById('g-parcelas')?.value) || 2;
+  const el    = document.getElementById('parc-preview');
+  if (!el) return;
+  el.textContent = (valor > 0 && n >= 2) ? `${n}x de R$ ${fmt(Math.round(valor/n*100)/100)}` : '';
+}
+
+function submitGasto() {
+  if (document.getElementById('toggle-parc')?.checked) addParcelado();
+  else addGasto();
+}
+
+async function addParcelado() {
+  const valor  = parseFloat(document.getElementById('g-valor')?.value);
+  const catId  = document.getElementById('g-cat')?.value;
+  const pmId   = document.getElementById('g-pm')?.value;
+  const subcat = document.getElementById('g-subcat')?.value?.trim();
+  const n      = parseInt(document.getElementById('g-parcelas')?.value) || 0;
+  if (!valor || valor <= 0) { showToast('Informe um valor válido', 'error'); return; }
+  if (!catId)               { showToast('Selecione uma categoria', 'error'); return; }
+  if (!pmId)                { showToast('Selecione o método de pagamento', 'error'); return; }
+  if (n < 2 || n > 48)     { showToast('Parcelas: entre 2 e 48', 'error'); return; }
+  const nome = subcat || categories.find(c => c.id === catId)?.name || 'Compra';
+  const vp   = Math.round((valor / n) * 100) / 100;
+  const resto = Math.round((valor - vp * (n - 1)) * 100) / 100;
+  function addMesesLocal(m, a, i) {
+    const total = (a * 12 + m - 1) + i;
+    return { month: (total % 12) + 1, year: Math.floor(total / 12) };
+  }
+  const entries = [];
+  for (let i = 0; i < n; i++) {
+    const { month, year } = addMesesLocal(mesAtual, anoAtual, i);
+    entries.push({ month, year, name: `${nome} (${i+1}/${n})`, planned_amount: i === n-1 ? resto : vp, recurrence_type: 'pontual', default_payment_method_id: pmId, category_id: catId, due_day: null, type: 'pontual' });
+  }
+  const { error } = await sb.from('fin_commitments').insert(entries);
+  if (error) { showToast('Erro: ' + error.message, 'error'); return; }
+  showToast(`${n}x de R$ ${fmt(vp)} lançadas ✓`, 'success');
+  await loadMes();
 }
 
 function atualizarSubcatList() {
