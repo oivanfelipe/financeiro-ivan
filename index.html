@@ -750,14 +750,15 @@ function renderDashboard() {
   const realClass = sobraReal >= 0 ? 'green' : 'red';
 
   const spendByCat = {};
-  // Gastos manuais lançados
+  // Gastos manuais lançados (reais)
   spendingSummary.forEach(s => {
     if (!spendByCat[s.category_name])
       spendByCat[s.category_name] = { spent: 0, catId: s.category_id, emoji: s.category_emoji };
     spendByCat[s.category_name].spent += Number(s.total_spent);
   });
-  // Automáticos e parcelados (commitments com due_day null = tipo gasto, não conta a pagar)
-  commitments.filter(c => c.due_day === null).forEach(c => {
+  // Automáticos (recurrence_type='automatico', due_day=null): cobranças que ocorrem todo mês
+  // sem entrada manual — Netflix, Spotify etc. Planejados (manual/pontual) são o TETO, não o gasto.
+  commitments.filter(c => c.recurrence_type === 'automatico' && c.due_day === null).forEach(c => {
     const cat = categories.find(x => x.id === c.category_id);
     if (!cat) return;
     const key = cat.name;
@@ -1568,6 +1569,29 @@ function renderGastos() {
   const totalGasto = spendingEntries.reduce((s,e) => s+Number(e.amount), 0);
   const hoje = new Date().toISOString().slice(0,10);
 
+  // Automáticos e parcelados do mês (due_day=null = tipo gasto, não conta a pagar)
+  const gastosCommitments = commitments.filter(c => c.due_day === null).sort((a,b) => a.name.localeCompare(b.name));
+  const totalCommit = gastosCommitments.reduce((s,c) => s+Number(c.planned_amount), 0);
+  const totalTudo   = totalGasto + totalCommit;
+
+  const commitHtml = gastosCommitments.length ? `
+    <div class="gastos-group-day">
+      <div class="gastos-day-label">Automáticos e Parcelados</div>
+      ${gastosCommitments.map(c => {
+        const cat = categories.find(x => x.id===c.category_id);
+        const pm  = paymentMethods.find(p => p.id===c.default_payment_method_id);
+        const icon = c.recurrence_type==='automatico' ? '🤖' : '💳';
+        return `<div class="gasto-item">
+          <div class="gasto-emoji">${esc(cat?.emoji||'💸')}</div>
+          <div class="gasto-info">
+            <div class="gasto-desc">${esc(c.name)}</div>
+            <div class="gasto-meta">${icon} ${esc(cat?.name||'')}${pm?' · '+esc(pm.name):''}</div>
+          </div>
+          <div class="gasto-valor">R$${fmt(c.planned_amount)}</div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   const byDay = {};
   spendingEntries.forEach(e => {
     const d = e.spend_date ? e.spend_date.slice(0,10) : 'sem-data';
@@ -1637,10 +1661,11 @@ function renderGastos() {
       <button class="btn-registrar" id="btn-gasto" onclick="submitGasto()">+ Registrar gasto</button>
     </div>
     <div class="gastos-resumo">
-      <div class="gr-card"><div class="gr-label">Total do mês</div><div class="gr-val red">R$${fmt(totalGasto)}</div></div>
-      <div class="gr-card"><div class="gr-label">Lançamentos</div><div class="gr-val">${spendingEntries.length}</div></div>
+      <div class="gr-card"><div class="gr-label">Total do mês</div><div class="gr-val red">R$${fmt(totalTudo)}</div></div>
+      <div class="gr-card"><div class="gr-label">Lançamentos</div><div class="gr-val">${spendingEntries.length + gastosCommitments.length}</div></div>
     </div>
-    ${listaHtml || '<div class="empty-state"><div class="icon">💸</div>Nenhum gasto registrado neste mês</div>'}
+    ${commitHtml}
+    ${listaHtml || (!gastosCommitments.length ? '<div class="empty-state"><div class="icon">💸</div>Nenhum gasto registrado neste mês</div>' : '')}
   `;
   setTimeout(atualizarSubcatList, 0);
 }
@@ -2108,7 +2133,7 @@ async function salvarTeto() {
 
 function abrirCatDrilldown(catId, catName) {
   const cat = categories.find(c => c.id === catId);
-  const catCommitments = commitments.filter(c => c.category_id === catId && c.due_day === null);
+  const catCommitments = commitments.filter(c => c.category_id === catId && c.recurrence_type === 'automatico' && c.due_day === null);
   const catEntries = spendingEntries.filter(e => e.category_id === catId).sort((a,b) => (b.spend_date||'').localeCompare(a.spend_date||''));
   const totalAuto   = catCommitments.reduce((s,c) => s + Number(c.planned_amount), 0);
   const totalManual = catEntries.reduce((s,e) => s + Number(e.amount), 0);
