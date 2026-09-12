@@ -256,6 +256,7 @@
       background: var(--bg); border: 1px solid var(--border); color: var(--text-2); border-radius: 12px;
       padding: 0 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
     }
+    .btn-pay-edit svg { width: 14px; height: 14px; stroke: currentColor; fill: none; flex-shrink: 0; }
     .btn-pay-edit:hover { border-color: var(--accent); color: var(--accent); }
     .pay-hist-item {
       display: flex; align-items: center; justify-content: space-between;
@@ -319,7 +320,9 @@
       position: absolute; top: 12px; right: 12px;
       background: none; border: none; color: var(--text-3); cursor: pointer;
       font-size: 18px; padding: 4px 6px; min-height: 32px; border-radius: 6px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
     }
+    .menu-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
     .menu-btn:hover { color: var(--text-2); background: var(--surface2); }
     .menu-popup {
       position: absolute; top: 42px; right: 12px;
@@ -333,6 +336,7 @@
       border-radius: 7px; cursor: pointer; font-size: 13px;
       border: none; background: none; color: var(--text-1); width: 100%; text-align: left;
     }
+    .menu-item svg { width: 15px; height: 15px; stroke: currentColor; fill: none; flex-shrink: 0; }
     .menu-item:hover { background: var(--surface2); }
     .menu-item.danger { color: var(--red); }
 
@@ -412,6 +416,7 @@
       padding: 4px 6px; border-radius: 6px; min-height: 44px; min-width: 36px;
       display: flex; align-items: center; justify-content: center;
     }
+    .gasto-del svg { width: 16px; height: 16px; stroke: currentColor; fill: none; flex-shrink: 0; }
     .gasto-del:hover { color: var(--red); background: var(--red-bg); }
 
     /* ── TETOS ── */
@@ -471,6 +476,7 @@
       background: none; border: 1px solid var(--border); color: var(--text-2); border-radius: 8px;
       padding: 6px 10px; font-size: 13px; cursor: pointer; min-height: 36px;
     }
+    .btn-card-act svg { width: 15px; height: 15px; stroke: currentColor; fill: none; flex-shrink: 0; }
     .btn-card-act:hover { border-color: var(--accent); color: var(--accent); }
     .btn-card-del:hover { border-color: var(--red) !important; color: var(--red) !important; }
     .btn-add-card {
@@ -662,6 +668,9 @@ let filtroGastosCat  = null;
 const fmt  = v => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtK = v => { const n = Number(v)||0; return n>=1000 ? `R$ ${(n/1000).toFixed(1)}k` : `R$ ${fmt(n)}`; };
 const esc  = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const ICO_TRASH  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+const ICO_PENCIL = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
 function toggleTheme() {
   const root = document.documentElement;
@@ -983,8 +992,8 @@ function renderPlanejamento() {
         <div class="plan-right">
           <div class="plan-val">R$ ${fmt(c.planned_amount)}</div>
           <div style="display:flex;gap:4px">
-            <button class="menu-btn" style="position:static" onclick="abrirEditarCommitment('${esc(c.id)}')">✏️</button>
-            <button class="menu-btn" style="position:static;color:#f87171" onclick="deletarCommitment('${esc(c.id)}','${esc(c.name)}')">🗑️</button>
+            <button class="menu-btn" style="position:static" onclick="abrirEditarCommitment('${esc(c.id)}')">${ICO_PENCIL}</button>
+            <button class="menu-btn" style="position:static;color:#f87171" onclick="deletarCommitment('${esc(c.id)}','${esc(c.name)}')">${ICO_TRASH}</button>
           </div>
         </div>
       </div>`;
@@ -1007,7 +1016,7 @@ function renderPlanejamento() {
         <div class="income-date">${e.entry_date ? new Date(e.entry_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : 'Sem data'}</div>
       </div>
       <div class="income-val">R$ ${fmt(e.amount)}</div>
-      <button class="gasto-del" onclick="deletarIncomeEntry('${esc(e.id)}')">🗑</button>
+      <button class="gasto-del" onclick="deletarIncomeEntry('${esc(e.id)}')">${ICO_TRASH}</button>
     </div>`).join('');
 
   el.innerHTML = `
@@ -1100,7 +1109,7 @@ function buildContaCard(c) {
   const payBtn = isPaid
     ? `<div style="display:flex;gap:8px;align-items:stretch">
         <div class="btn-pay-full paid-btn" style="flex:1">✓ Pago R$ ${fmt(paid)}</div>
-        <button class="btn-pay-edit" onclick="abrirPagamentoModal('${esc(c.id)}')">✏️ Editar</button>
+        <button class="btn-pay-edit" onclick="abrirPagamentoModal('${esc(c.id)}')" style="display:flex;align-items:center;gap:5px">${ICO_PENCIL} Editar</button>
        </div>`
     : `<button class="btn-pay-full" onclick="abrirPagamentoModal('${esc(c.id)}')">
         ${paid > 0 ? '+ Adicionar pagamento' : 'Registrar pagamento'}
@@ -1110,8 +1119,8 @@ function buildContaCard(c) {
     <div class="conta-card ${isOverdue?'overdue':''} ${isToday?'today':''}">
       <button class="menu-btn" onclick="toggleMenu('${esc(c.id)}')">⋯</button>
       <div class="menu-popup" id="menu-${esc(c.id)}">
-        <button class="menu-item" onclick="abrirEditarCommitment('${esc(c.id)}');fecharMenus()">✏️ Editar</button>
-        <button class="menu-item danger" onclick="deletarCommitment('${esc(c.id)}','${esc(c.name)}');fecharMenus()">🗑️ Excluir</button>
+        <button class="menu-item" onclick="abrirEditarCommitment('${esc(c.id)}');fecharMenus()" style="display:flex;align-items:center;gap:8px">${ICO_PENCIL} Editar</button>
+        <button class="menu-item danger" onclick="deletarCommitment('${esc(c.id)}','${esc(c.name)}');fecharMenus()" style="display:flex;align-items:center;gap:8px">${ICO_TRASH} Excluir</button>
       </div>
       <div class="conta-top">
         <div class="conta-left">
@@ -1176,7 +1185,7 @@ async function abrirPagamentoModal(id) {
           <span class="pay-hist-val">R$ ${fmt(pg.amount)}</span>
           <span class="pay-hist-meta">${pm?esc(pm.name):''}${dataFmt?' · '+dataFmt:''}</span>
         </div>
-        <button class="btn-card-act btn-card-del" onclick="deletarPagamento('${esc(pg.id)}','${esc(id)}')">🗑️</button>
+        <button class="btn-card-act btn-card-del" onclick="deletarPagamento('${esc(pg.id)}','${esc(id)}')" style="display:flex;align-items:center;justify-content:center">${ICO_TRASH}</button>
       </div>`;
     }).join('')}
     <div style="border-top:1px solid #1a1a1a;margin:12px 0"></div>` : '';
@@ -1644,7 +1653,7 @@ function renderFaturas() {
         <span class="fatura-cat-name">🤖 ${esc(c.name)}</span>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="fatura-cat-val">R$ ${fmt(c.planned_amount)}</span>
-          <button class="btn-card-act" style="font-size:13px" onclick="editarAutomatico('${esc(c.id)}','${esc(c.name)}',${Number(c.planned_amount)})">✏️</button>
+          <button class="btn-card-act" style="display:flex;align-items:center;justify-content:center" onclick="editarAutomatico('${esc(c.id)}','${esc(c.name)}',${Number(c.planned_amount)})">${ICO_PENCIL}</button>
         </div>
       </div>`).join('');
     const parceladoRowsHtml = parceladoItems.map(c => `
@@ -1723,7 +1732,7 @@ function renderGastos() {
             <div class="gasto-meta">${esc(cat?.name||'')}${e.subcategory&&e.description?' · '+esc(e.description):''}${pm?' · '+esc(pm.name):''}</div>
           </div>
           <div class="gasto-valor">R$${fmt(e.amount)}</div>
-          <button class="gasto-del" onclick="deletarGasto('${esc(e.id)}')">🗑</button>
+          <button class="gasto-del" onclick="deletarGasto('${esc(e.id)}')">${ICO_TRASH}</button>
         </div>`;
     }).join('');
     return `<div class="gastos-group-day"><div class="gastos-day-label">${label}</div>${items}</div>`;
@@ -1915,8 +1924,8 @@ function renderPerfil() {
           <div class="card-meta">${meta}</div>
         </div>
         <div class="card-actions">
-          <button class="btn-card-act" onclick="abrirCartaoModal('${esc(pm.id)}')">✏️</button>
-          <button class="btn-card-act btn-card-del" onclick="deletarCartao('${esc(pm.id)}','${esc(pm.name)}')">🗑️</button>
+          <button class="btn-card-act" onclick="abrirCartaoModal('${esc(pm.id)}')" style="display:flex;align-items:center;justify-content:center">${ICO_PENCIL}</button>
+          <button class="btn-card-act btn-card-del" onclick="deletarCartao('${esc(pm.id)}','${esc(pm.name)}')" style="display:flex;align-items:center;justify-content:center">${ICO_TRASH}</button>
         </div>
       </div>`;
   }).join('');
@@ -1926,8 +1935,8 @@ function renderPerfil() {
       <span class="cat-emoji">${esc(cat.emoji||'•')}</span>
       <span class="cat-name">${esc(cat.name)}</span>
       <div class="cat-actions">
-        <button class="btn-card-act" onclick="abrirCatModal('${esc(cat.id)}')">✏️</button>
-        <button class="btn-card-act btn-card-del" onclick="deletarCategoria('${esc(cat.id)}','${esc(cat.name)}')">🗑️</button>
+        <button class="btn-card-act" onclick="abrirCatModal('${esc(cat.id)}')" style="display:flex;align-items:center;justify-content:center">${ICO_PENCIL}</button>
+        <button class="btn-card-act btn-card-del" onclick="deletarCategoria('${esc(cat.id)}','${esc(cat.name)}')" style="display:flex;align-items:center;justify-content:center">${ICO_TRASH}</button>
       </div>
     </div>`).join('');
 
@@ -1942,7 +1951,7 @@ function renderPerfil() {
           <div class="card-meta">${meta}</div>
         </div>
         <div class="card-actions">
-          <button class="btn-card-act" onclick="abrirTetoModal('${esc(cat.id)}')">✏️</button>
+          <button class="btn-card-act" onclick="abrirTetoModal('${esc(cat.id)}')" style="display:flex;align-items:center;justify-content:center">${ICO_PENCIL}</button>
         </div>
       </div>`;
   }).join('');
