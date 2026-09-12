@@ -5,422 +5,495 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
-  <title>Orçamento Ivan v2</title>
+  <title>Orçamento Ivan</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0a0a0a; color: #f0f0f0; font-size: 15px;
-      min-height: 100vh; max-width: 480px; margin: 0 auto;
-      padding-bottom: 80px;
+    /* ── TOKENS ── */
+    :root {
+      --accent:      #7C3AED;
+      --accent-soft: #F5F3FF;
+      --bg:          #FFFFFF;
+      --surface:     #F8FAFC;
+      --surface2:    #F1F5F9;
+      --border:      #EAECF0;
+      --text-1:      #0D1117;
+      --text-2:      #6B7280;
+      --text-3:      #B0B7C3;
+      --green:       #059669; --green-bg: #F0FDF4;
+      --red:         #DC2626; --red-bg:   #FEF2F2;
+      --amber:       #D97706; --amber-bg: #FFFBEB;
+      --nav-h:       64px;
+      --radius:      12px;
     }
-    input, select, textarea { font-size: 16px !important; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg:          #0C0A1A; --surface: #160F2A; --surface2: #1E1535;
+        --border:      #2A1F45; --text-1: #F0EEFF; --text-2: #8B81A8; --text-3: #3D3055;
+        --accent-soft: #2E1065; --green-bg: #052E16; --red-bg: #3B0A0A; --amber-bg: #3B1F00;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg:          #0C0A1A; --surface: #160F2A; --surface2: #1E1535;
+      --border:      #2A1F45; --text-1: #F0EEFF; --text-2: #8B81A8; --text-3: #3D3055;
+      --accent-soft: #2E1065; --green-bg: #052E16; --red-bg: #3B0A0A; --amber-bg: #3B1F00;
+    }
+    :root[data-theme="light"] {
+      --bg: #FFFFFF; --surface: #F8FAFC; --surface2: #F1F5F9;
+      --border: #EAECF0; --text-1: #0D1117; --text-2: #6B7280; --text-3: #B0B7C3;
+      --accent-soft: #F5F3FF; --green-bg: #F0FDF4; --red-bg: #FEF2F2; --amber-bg: #FFFBEB;
+    }
 
-    /* Header */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg); color: var(--text-1); font-size: 15px;
+      min-height: 100vh; max-width: 480px; margin: 0 auto;
+      padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    }
+    input, select, textarea { font-size: 16px !important; font-family: inherit; }
+
+    /* ── HEADER ── */
     .app-header {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 14px 16px 10px; background: #0a0a0a;
+      padding: 14px 16px 10px; background: var(--bg);
       position: sticky; top: 0; z-index: 10;
-      border-bottom: 1px solid #1a1a1a;
+      border-bottom: 1px solid var(--border);
     }
-    .app-title { font-size: 17px; font-weight: 700; color: #fff; }
-    .app-title span { color: #6366f1; }
+    .app-title { font-size: 17px; font-weight: 700; color: var(--text-1); }
+    .app-title span { color: var(--accent); }
     .mes-nav { display: flex; align-items: center; gap: 2px; }
     .mes-nav-btn {
-      background: none; border: none; color: #555; font-size: 22px;
+      background: none; border: none; color: var(--text-3); font-size: 22px;
       cursor: pointer; min-height: 44px; min-width: 36px;
       display: flex; align-items: center; justify-content: center;
     }
-    .mes-nav-btn:hover { color: #aaa; }
-    .mes-nav-label { font-size: 13px; font-weight: 600; color: #e0e0e0; white-space: nowrap; }
+    .mes-nav-btn:hover { color: var(--text-2); }
+    .mes-nav-label { font-size: 13px; font-weight: 600; color: var(--text-1); white-space: nowrap; }
     .btn-icon {
-      background: none; border: none; color: #555; font-size: 18px;
+      background: none; border: none; color: var(--text-3); font-size: 18px;
       cursor: pointer; min-height: 44px; min-width: 44px;
       display: flex; align-items: center; justify-content: center;
       border-radius: 8px;
     }
-    .btn-icon:hover { color: #aaa; background: #1a1a1a; }
+    .btn-icon:hover { color: var(--text-2); background: var(--surface); }
 
-    /* Content */
+    /* ── CONTENT ── */
     .content { padding: 16px; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    /* Bottom nav */
+    /* ── HERO BLOCK ── */
+    .hero {
+      padding: 28px 0 24px; text-align: center;
+    }
+    .hero-eyebrow {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-3); margin-bottom: 6px;
+    }
+    .hero-number {
+      font-size: 48px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+      color: var(--text-1); font-variant-numeric: tabular-nums;
+    }
+    .hero-number.green { color: var(--green); }
+    .hero-number.red   { color: var(--red); }
+    .hero-sub {
+      font-size: 13px; color: var(--text-2); margin-top: 8px;
+    }
+    .hero-chips { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .hero-chip {
+      font-size: 12px; font-weight: 600; padding: 5px 12px;
+      border-radius: 99px; background: var(--surface);
+      color: var(--text-2); border: 1px solid var(--border);
+    }
+    .hero-chip.green { background: var(--green-bg); color: var(--green); border-color: transparent; }
+    .hero-chip.red   { background: var(--red-bg);   color: var(--red);   border-color: transparent; }
+    .hero-chip.amber { background: var(--amber-bg); color: var(--amber); border-color: transparent; }
+    .hero-divider { height: 1px; background: var(--border); margin: 0 0 16px; }
+
+    /* ── BOTTOM NAV ── */
     .bottom-nav {
       position: fixed; bottom: 0;
       left: 50%; transform: translateX(-50%);
       width: 100%; max-width: 480px;
-      background: #111; border-top: 1px solid #1e1e1e;
+      background: var(--bg); border-top: 1px solid var(--border);
       display: flex; z-index: 100;
       padding-bottom: env(safe-area-inset-bottom);
     }
     .nav-item {
       flex: 1; display: flex; flex-direction: column; align-items: center;
-      padding: 10px 0 8px; border: none; background: transparent;
-      color: #555; font-size: 10px; gap: 3px; cursor: pointer;
-      transition: color 0.15s; min-height: 58px;
+      padding: 12px 0 10px; border: none; background: transparent;
+      color: var(--text-3); gap: 5px; cursor: pointer;
+      transition: color 0.15s; min-height: var(--nav-h); position: relative;
     }
-    .nav-item.active { color: #6366f1; }
-    .nav-icon { font-size: 20px; line-height: 1; }
+    .nav-item svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-item.active { color: var(--text-1); }
+    .nav-pip {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: var(--accent); position: absolute; bottom: 6px;
+      display: none;
+    }
+    .nav-item.active .nav-pip { display: block; }
 
-    /* Toast */
+    /* ── TOAST ── */
     .toast {
       position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(200px);
-      background: #1e1e1e; border: 1px solid #333; color: #f0f0f0;
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text-1);
       border-radius: 24px; padding: 10px 18px; font-size: 13px;
       display: flex; align-items: center; gap: 10px;
       transition: transform 0.3s ease; z-index: 200; white-space: nowrap;
       max-width: calc(100vw - 32px);
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
-    .toast.error { background: #2a0a0a; border-color: #5a1a1a; color: #f87171; }
-    .toast.success { background: #0a2a0a; border-color: #1a5a1a; color: #4ade80; }
+    .toast.error   { background: var(--red-bg);   border-color: var(--red);   color: var(--red); }
+    .toast.success { background: var(--green-bg); border-color: var(--green); color: var(--green); }
     .btn-retry {
-      background: rgba(255,255,255,0.15); border: none; border-radius: 14px;
+      background: var(--accent); border: none; border-radius: 14px;
       color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; cursor: pointer;
     }
 
-    /* Loading */
-    .loading { display: flex; align-items: center; gap: 10px; padding: 32px 0; color: #555; font-size: 13px; }
-    .spinner { width: 20px; height: 20px; border: 2px solid #333; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    /* ── LOADING ── */
+    .loading { display: flex; align-items: center; gap: 10px; padding: 32px 0; color: var(--text-3); font-size: 13px; }
+    .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .empty-state { text-align: center; padding: 40px 0; color: #444; font-size: 13px; }
+    .empty-state { text-align: center; padding: 40px 0; color: var(--text-3); font-size: 13px; }
     .empty-state .icon { font-size: 32px; margin-bottom: 10px; }
 
     .sec-title {
-      font-size: 11px; font-weight: 700; color: #555;
+      font-size: 11px; font-weight: 700; color: var(--text-3);
       text-transform: uppercase; letter-spacing: 0.08em; margin: 20px 0 10px;
     }
     .secao-divider {
-      font-size: 10px; font-weight: 700; color: #444; text-transform: uppercase;
+      font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase;
       letter-spacing: 0.1em; padding: 10px 0 4px; display: flex; align-items: center; gap: 8px;
     }
-    .secao-divider::after { content: ''; flex: 1; height: 1px; background: #1e1e1e; }
+    .secao-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-    .progress-bar { background: #222; border-radius: 99px; height: 6px; overflow: hidden; }
-    .progress-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; background: #4ade80; }
-    .progress-fill.amber { background: #fbbf24; }
-    .progress-fill.red   { background: #f87171; }
+    .progress-bar { background: var(--surface2); border-radius: 99px; height: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; background: var(--green); }
+    .progress-fill.amber { background: var(--amber); }
+    .progress-fill.red   { background: var(--red); }
 
-    /* Dashboard */
+    /* ── DASHBOARD KPI ── */
     .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
     .kpi-card {
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; padding: 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
     }
-    .kpi-card.highlight { border-color: #6366f1; background: #0d0d1a; margin-bottom: 20px; }
-    .kpi-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-    .kpi-value { font-size: 22px; font-weight: 700; color: #fff; }
-    .kpi-value.green { color: #4ade80; }
-    .kpi-value.red   { color: #f87171; }
-    .kpi-sub { font-size: 11px; color: #555; margin-top: 4px; }
+    .kpi-card.highlight { border-color: var(--accent); background: var(--accent-soft); margin-bottom: 20px; }
+    .kpi-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .kpi-value { font-size: 22px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+    .kpi-value.green { color: var(--green); }
+    .kpi-value.red   { color: var(--red); }
+    .kpi-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
 
     .pace-card {
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 12px; padding: 14px; margin-bottom: 8px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 8px;
     }
     .pace-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .pace-name { font-size: 14px; font-weight: 500; color: #e0e0e0; }
+    .pace-name { font-size: 14px; font-weight: 500; color: var(--text-1); }
     .pace-badge { font-size: 12px; font-weight: 600; }
-    .pace-badge.ok   { color: #4ade80; }
-    .pace-badge.warn { color: #fbbf24; }
-    .pace-badge.over { color: #f87171; }
-    .pace-amounts { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 6px; }
+    .pace-badge.ok   { color: var(--green); }
+    .pace-badge.warn { color: var(--amber); }
+    .pace-badge.over { color: var(--red); }
+    .pace-amounts { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
 
     .top-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .top-rank { font-size: 12px; color: #444; width: 16px; flex-shrink: 0; }
-    .top-name { font-size: 13px; color: #ccc; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .top-bar-wrap { width: 80px; background: #1a1a1a; border-radius: 4px; height: 6px; flex-shrink: 0; }
-    .top-bar { height: 6px; border-radius: 4px; background: #6366f1; }
-    .top-val { font-size: 13px; color: #888; white-space: nowrap; }
+    .top-rank { font-size: 12px; color: var(--text-3); width: 16px; flex-shrink: 0; }
+    .top-name { font-size: 13px; color: var(--text-2); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top-bar-wrap { width: 80px; background: var(--surface2); border-radius: 4px; height: 6px; flex-shrink: 0; }
+    .top-bar { height: 6px; border-radius: 4px; background: var(--accent); }
+    .top-val { font-size: 13px; color: var(--text-2); white-space: nowrap; }
 
     .alert-item {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 10px 14px; background: #1f0a0a; border: 1px solid #3a1414;
-      border-radius: 10px; margin-bottom: 6px; font-size: 13px;
+      padding: 10px 14px; background: var(--red-bg); border: 1px solid var(--red);
+      border-radius: 10px; margin-bottom: 6px; font-size: 13px; opacity: 0.9;
     }
-    .alert-item .name { color: #fca5a5; }
-    .alert-item .val  { color: #f87171; font-weight: 600; }
+    .alert-item .name { color: var(--red); }
+    .alert-item .val  { color: var(--red); font-weight: 600; }
 
-    /* Contas */
+    /* ── CONTAS ── */
     .contas-top-row {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
     }
-    .contas-top-title { font-size: 16px; font-weight: 700; color: #fff; }
+    .contas-top-title { font-size: 16px; font-weight: 700; color: var(--text-1); }
     .btn-nova {
-      background: #6366f1; border: none; color: #fff; border-radius: 10px;
+      background: var(--accent); border: none; color: #fff; border-radius: 10px;
       padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 44px;
     }
     .contas-summary {
       display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;
     }
     .cs-card {
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 12px; padding: 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px;
     }
-    .cs-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .cs-val { font-size: 19px; font-weight: 700; }
-    .cs-val.red   { color: #f87171; }
-    .cs-val.green { color: #4ade80; }
+    .cs-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .cs-val { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-1); }
+    .cs-val.red   { color: var(--red); }
+    .cs-val.green { color: var(--green); }
 
     .conta-card {
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 16px; margin-bottom: 10px; position: relative;
     }
-    .conta-card.overdue { border-color: #3a1414; }
-    .conta-card.today   { border-color: #3a2a08; }
+    .conta-card.overdue { border-color: var(--red); }
+    .conta-card.today   { border-color: var(--amber); }
     .conta-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .conta-left { flex: 1; min-width: 0; padding-right: 40px; }
-    .conta-name { font-size: 15px; font-weight: 600; color: #e0e0e0; }
-    .conta-meta { font-size: 12px; color: #555; margin-top: 3px; }
+    .conta-name { font-size: 15px; font-weight: 600; color: var(--text-1); }
+    .conta-meta { font-size: 12px; color: var(--text-3); margin-top: 3px; }
     .conta-right { text-align: right; flex-shrink: 0; }
-    .conta-val  { font-size: 17px; font-weight: 700; color: #fff; }
-    .conta-paid { font-size: 11px; color: #4ade80; margin-top: 2px; }
-    .conta-rem  { font-size: 12px; color: #f87171; margin-top: 2px; }
+    .conta-val  { font-size: 17px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+    .conta-paid { font-size: 11px; color: var(--green); margin-top: 2px; }
+    .conta-rem  { font-size: 12px; color: var(--red);   margin-top: 2px; }
     .pag-diff { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin: 6px 0 4px; display: inline-block; }
-    .pag-diff.over  { background: #2a0a0a; color: #f87171; }
-    .pag-diff.under { background: #0a2a0a; color: #4ade80; }
-    .pag-diff.exact { background: #0a2a0a; color: #4ade80; }
+    .pag-diff.over  { background: var(--red-bg);   color: var(--red); }
+    .pag-diff.under { background: var(--green-bg); color: var(--green); }
+    .pag-diff.exact { background: var(--green-bg); color: var(--green); }
     .btn-pay-edit {
-      background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; border-radius: 12px;
+      background: var(--bg); border: 1px solid var(--border); color: var(--text-2); border-radius: 12px;
       padding: 0 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
     }
-    .btn-pay-edit:hover { border-color: #6366f1; color: #818cf8; }
+    .btn-pay-edit:hover { border-color: var(--accent); color: var(--accent); }
     .pay-hist-item {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 8px 0; border-bottom: 1px solid #1a1a1a;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
     }
     .pay-hist-info { display: flex; flex-direction: column; gap: 2px; }
-    .pay-hist-val  { font-size: 14px; font-weight: 600; color: #e0e0e0; }
-    .pay-hist-meta { font-size: 11px; color: #555; }
+    .pay-hist-val  { font-size: 14px; font-weight: 600; color: var(--text-1); }
+    .pay-hist-meta { font-size: 11px; color: var(--text-3); }
 
     .badge {
       display: inline-flex; align-items: center; font-size: 11px; font-weight: 600;
       padding: 3px 9px; border-radius: 99px; margin-top: 8px;
     }
-    .badge-pago    { background: #0a2a0a; color: #4ade80; }
-    .badge-parcial { background: #0a1a2a; color: #60a5fa; }
-    .badge-vencido { background: #2a0a0a; color: #f87171; }
-    .badge-hoje    { background: #2a1a00; color: #fbbf24; }
-    .badge-semana  { background: #1a1a00; color: #fcd34d; }
-    .badge-futuro  { background: #111; color: #555; }
-    .badge-fatura  { background: #1a0a2a; color: #c084fc; }
-    .badge-auto    { background: #1a0a2a; color: #c084fc; }
-    .badge-manual  { background: #2a1a00; color: #fbbf24; }
+    .badge-pago    { background: var(--green-bg); color: var(--green); }
+    .badge-parcial { background: var(--accent-soft); color: var(--accent); }
+    .badge-vencido { background: var(--red-bg);   color: var(--red); }
+    .badge-hoje    { background: var(--amber-bg); color: var(--amber); }
+    .badge-semana  { background: var(--amber-bg); color: var(--amber); }
+    .badge-futuro  { background: var(--surface2); color: var(--text-3); }
+    .badge-fatura  { background: var(--accent-soft); color: var(--accent); }
+    .badge-auto    { background: var(--accent-soft); color: var(--accent); }
+    .badge-manual  { background: var(--amber-bg); color: var(--amber); }
 
-    /* Toggle de recorrência */
+    /* ── RECORRÊNCIA ── */
     .rec-toggle { display: flex; gap: 7px; margin-bottom: 14px; }
     .rec-opt {
-      flex: 1; padding: 10px 6px; background: #1a1a1a; border: 2px solid #2a2a2a;
+      flex: 1; padding: 10px 6px; background: var(--surface); border: 2px solid var(--border);
       border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.15s;
     }
     .rec-opt-icon { font-size: 18px; display: block; margin-bottom: 3px; }
-    .rec-opt-label { font-size: 11px; font-weight: 600; color: #666; display: block; }
-    .rec-opt-hint { font-size: 9px; color: #444; display: block; margin-top: 2px; }
-    .rec-opt.sel-auto  { border-color: #c084fc; background: #1a0a2a; }
-    .rec-opt.sel-auto .rec-opt-label  { color: #c084fc; }
-    .rec-opt.sel-manual { border-color: #fbbf24; background: #2a1a00; }
-    .rec-opt.sel-manual .rec-opt-label { color: #fbbf24; }
-    .rec-opt.sel-pontual { border-color: #6366f1; background: #0d0d1a; }
-    .rec-opt.sel-pontual .rec-opt-label { color: #818cf8; }
+    .rec-opt-label { font-size: 11px; font-weight: 600; color: var(--text-2); display: block; }
+    .rec-opt-hint { font-size: 9px; color: var(--text-3); display: block; margin-top: 2px; }
+    .rec-opt.sel-auto  { border-color: var(--accent); background: var(--accent-soft); }
+    .rec-opt.sel-auto .rec-opt-label  { color: var(--accent); }
+    .rec-opt.sel-manual { border-color: var(--amber); background: var(--amber-bg); }
+    .rec-opt.sel-manual .rec-opt-label { color: var(--amber); }
+    .rec-opt.sel-pontual { border-color: var(--accent); background: var(--accent-soft); }
+    .rec-opt.sel-pontual .rec-opt-label { color: var(--accent); }
 
-    /* Planejamento */
+    /* ── PLANEJAMENTO ── */
     .plan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .plan-title  { font-size: 16px; font-weight: 700; color: #fff; }
-    .plan-total  { font-size: 13px; color: #f87171; font-weight: 600; }
+    .plan-title  { font-size: 16px; font-weight: 700; color: var(--text-1); }
+    .plan-total  { font-size: 13px; color: var(--red); font-weight: 600; }
     .plan-card {
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 13px 14px; margin-bottom: 7px;
       display: flex; align-items: center; gap: 10px;
     }
     .plan-emoji { font-size: 20px; flex-shrink: 0; }
     .plan-info  { flex: 1; min-width: 0; }
-    .plan-name  { font-size: 14px; font-weight: 600; color: #e0e0e0; }
-    .plan-meta  { font-size: 11px; color: #555; margin-top: 2px; }
+    .plan-name  { font-size: 14px; font-weight: 600; color: var(--text-1); }
+    .plan-meta  { font-size: 11px; color: var(--text-3); margin-top: 2px; }
     .plan-right { text-align: right; flex-shrink: 0; }
-    .plan-val   { font-size: 14px; font-weight: 700; color: #f0f0f0; }
-    .plan-day   { font-size: 11px; color: #444; margin-top: 2px; }
+    .plan-val   { font-size: 14px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+    .plan-day   { font-size: 11px; color: var(--text-3); margin-top: 2px; }
 
     .conta-prog { margin-top: 10px; }
     .conta-prog .progress-bar { height: 5px; }
 
     .menu-btn {
       position: absolute; top: 12px; right: 12px;
-      background: none; border: none; color: #444; cursor: pointer;
+      background: none; border: none; color: var(--text-3); cursor: pointer;
       font-size: 18px; padding: 4px 6px; min-height: 32px; border-radius: 6px; line-height: 1;
     }
-    .menu-btn:hover { color: #888; background: #1e1e1e; }
+    .menu-btn:hover { color: var(--text-2); background: var(--surface2); }
     .menu-popup {
       position: absolute; top: 42px; right: 12px;
-      background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 10px;
-      padding: 4px; z-index: 20; min-width: 140px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 4px; z-index: 20; min-width: 140px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
       display: none;
     }
     .menu-popup.open { display: block; }
     .menu-item {
       display: flex; align-items: center; gap: 8px; padding: 10px 12px;
       border-radius: 7px; cursor: pointer; font-size: 13px;
-      border: none; background: none; color: #ccc; width: 100%; text-align: left;
+      border: none; background: none; color: var(--text-1); width: 100%; text-align: left;
     }
-    .menu-item:hover { background: #2a2a2a; }
-    .menu-item.danger { color: #f87171; }
+    .menu-item:hover { background: var(--surface2); }
+    .menu-item.danger { color: var(--red); }
 
     .btn-pay-full {
-      width: 100%; background: #6366f1; border: none; color: #fff;
+      width: 100%; background: var(--accent); border: none; color: #fff;
       border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600;
       cursor: pointer; margin-top: 12px; min-height: 48px;
     }
-    .btn-pay-full:hover { background: #4f46e5; }
-    .btn-pay-full.paid-btn { background: #141414; border: 1px solid #1e1e1e; color: #4ade80; cursor: default; }
+    .btn-pay-full:hover { opacity: 0.9; }
+    .btn-pay-full.paid-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--green); cursor: default; }
 
-    /* Faturas */
+    /* ── FATURAS ── */
     .fatura-card {
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 16px; margin-bottom: 12px;
     }
     .fatura-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .fatura-card-name { font-size: 15px; font-weight: 600; color: #e0e0e0; display: flex; align-items: center; gap: 8px; }
+    .fatura-card-name { font-size: 15px; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 8px; }
     .fatura-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-    .fatura-total { font-size: 20px; font-weight: 700; color: #fff; }
-    .fatura-sub { font-size: 12px; color: #555; margin-bottom: 10px; }
-    .fatura-cat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-top: 1px solid #1e1e1e; }
-    .fatura-total-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 0; margin-top: 8px; border-top: 1px solid #333; font-size: 13px; color: #aaa; }
-    .fatura-cat-name { color: #888; }
-    .fatura-cat-val  { color: #ccc; font-weight: 500; }
-    /* Gastos */
+    .fatura-total { font-size: 20px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+    .fatura-sub { font-size: 12px; color: var(--text-3); margin-bottom: 10px; }
+    .fatura-cat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-top: 1px solid var(--border); }
+    .fatura-total-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 0; margin-top: 8px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
+    .fatura-cat-name { color: var(--text-2); }
+    .fatura-cat-val  { color: var(--text-1); font-weight: 500; }
+
+    /* ── GASTOS ── */
     .gastos-form {
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 16px; margin-bottom: 18px;
     }
-    .gastos-form-title { font-size: 12px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+    .gastos-form-title { font-size: 12px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
     .field { margin-bottom: 12px; }
-    .field label { display: block; font-size: 11px; color: #555; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .field label { display: block; font-size: 11px; color: var(--text-3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
     .field input, .field select, .field textarea {
-      width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a;
-      border-radius: 10px; padding: 12px 14px; color: #f0f0f0;
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px; color: var(--text-1);
       font-size: 16px; outline: none; transition: border-color 0.15s; font-family: inherit;
     }
-    .field input:focus, .field select:focus, .field textarea:focus { border-color: #6366f1; }
-    .field select option { background: #1a1a1a; }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+    .field select option { background: var(--bg); color: var(--text-1); }
     .field-row { display: flex; gap: 10px; }
     .field-row .field { flex: 1; margin-bottom: 0; }
     .btn-primary {
-      width: 100%; background: #6366f1; border: none; color: #fff;
+      width: 100%; background: var(--accent); border: none; color: #fff;
       border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600;
-      cursor: pointer; min-height: 48px; transition: background 0.15s;
+      cursor: pointer; min-height: 48px; transition: opacity 0.15s;
     }
-    .btn-primary:hover { background: #4f46e5; }
+    .btn-primary:hover { opacity: 0.9; }
     .btn-registrar {
-      width: 100%; background: #22c55e; border: none; color: #fff;
+      width: 100%; background: var(--green); border: none; color: #fff;
       border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600;
       cursor: pointer; min-height: 48px; margin-top: 4px;
     }
-    .btn-registrar:hover { background: #16a34a; }
+    .btn-registrar:hover { opacity: 0.9; }
 
     .gastos-resumo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-    .gr-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 12px; padding: 14px; text-align: center; }
-    .gr-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .gr-val { font-size: 19px; font-weight: 700; color: #f0f0f0; }
-    .gr-val.red { color: #f87171; }
+    .gr-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; }
+    .gr-label { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .gr-val { font-size: 19px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+    .gr-val.red { color: var(--red); }
 
     .gastos-group-day { margin-bottom: 14px; }
-    .gastos-day-label { font-size: 11px; color: #444; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .gastos-day-label { font-size: 11px; color: var(--text-3); font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
     .gasto-item {
       display: flex; align-items: center; gap: 10px;
-      padding: 12px 14px; background: #141414; border: 1px solid #1e1e1e;
-      border-radius: 12px; margin-bottom: 6px;
+      padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 6px;
     }
     .gasto-emoji { font-size: 20px; flex-shrink: 0; }
     .gasto-info { flex: 1; min-width: 0; }
-    .gasto-desc { font-size: 14px; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .gasto-meta { font-size: 12px; color: #555; margin-top: 2px; }
-    .gasto-valor { font-size: 14px; font-weight: 600; color: #f0f0f0; white-space: nowrap; }
+    .gasto-desc { font-size: 14px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gasto-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .gasto-valor { font-size: 14px; font-weight: 600; color: var(--text-1); white-space: nowrap; font-variant-numeric: tabular-nums; }
     .gasto-del {
-      background: none; border: none; color: #333; cursor: pointer; font-size: 16px;
+      background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 16px;
       padding: 4px 6px; border-radius: 6px; min-height: 44px; min-width: 36px;
       display: flex; align-items: center; justify-content: center;
     }
-    .gasto-del:hover { color: #f87171; background: #1a1a1a; }
+    .gasto-del:hover { color: var(--red); background: var(--red-bg); }
 
-    /* Tetos de gasto */
-    .teto-card { background:#141414; border:1px solid #1e1e1e; border-radius:12px; padding:13px 14px; margin-bottom:8px; }
+    /* ── TETOS ── */
+    .teto-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:13px 14px; margin-bottom:8px; }
     .teto-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
     .teto-cat { display:flex; align-items:center; gap:8px; }
     .teto-emoji { font-size:20px; }
-    .teto-name { font-size:14px; font-weight:600; color:#e0e0e0; }
+    .teto-name { font-size:14px; font-weight:600; color:var(--text-1); }
     .teto-vals { font-size:13px; white-space:nowrap; }
-    .teto-spent { font-weight:700; color:#e0e0e0; }
-    .teto-spent.red { color:#f87171; }
-    .teto-budget { color:#555; }
+    .teto-spent { font-weight:700; color:var(--text-1); font-variant-numeric:tabular-nums; }
+    .teto-spent.red { color:var(--red); }
+    .teto-budget { color:var(--text-3); }
     .teto-bar { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
     .teto-bar .progress-bar { flex:1; }
-    .teto-pct { font-size:11px; color:#555; min-width:30px; text-align:right; }
-    .teto-expand-btn { width:100%; background:none; border:none; color:#6366f1; font-size:12px; cursor:pointer; padding:4px 0; text-align:left; }
-    .teto-entries { padding-top:8px; border-top:1px solid #1a1a1a; margin-top:4px; display:none; }
-    .teto-entry { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #111; font-size:13px; }
+    .teto-pct { font-size:11px; color:var(--text-3); min-width:30px; text-align:right; }
+    .teto-expand-btn { width:100%; background:none; border:none; color:var(--accent); font-size:12px; cursor:pointer; padding:4px 0; text-align:left; }
+    .teto-entries { padding-top:8px; border-top:1px solid var(--border); margin-top:4px; display:none; }
+    .teto-entry { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid var(--surface2); font-size:13px; }
     .teto-entry:last-child { border-bottom:none; }
-    .teto-entry-desc { color:#ccc; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .teto-entry-date { color:#555; font-size:11px; white-space:nowrap; margin:0 8px; }
-    .teto-entry-val { color:#e0e0e0; font-weight:600; white-space:nowrap; }
-    .teto-subcats { margin-bottom:6px; border-top:1px solid #1e1e1e; padding-top:8px; }
-    .teto-sub-row { display:flex; align-items:center; padding:5px 0; font-size:13px; border-bottom:1px solid #0f0f0f; }
+    .teto-entry-desc { color:var(--text-1); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .teto-entry-date { color:var(--text-3); font-size:11px; white-space:nowrap; margin:0 8px; }
+    .teto-entry-val { color:var(--text-1); font-weight:600; white-space:nowrap; }
+    .teto-subcats { margin-bottom:6px; border-top:1px solid var(--border); padding-top:8px; }
+    .teto-sub-row { display:flex; align-items:center; padding:5px 0; font-size:13px; border-bottom:1px solid var(--surface); }
     .teto-sub-row:last-child { border-bottom:none; }
-    .teto-sub-name { flex:1; color:#aaa; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .teto-sub-count { font-size:11px; color:#555; margin-right:8px; white-space:nowrap; }
-    .teto-sub-val { font-weight:600; color:#e0e0e0; white-space:nowrap; }
+    .teto-sub-name { flex:1; color:var(--text-2); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .teto-sub-count { font-size:11px; color:var(--text-3); margin-right:8px; white-space:nowrap; }
+    .teto-sub-val { font-weight:600; color:var(--text-1); white-space:nowrap; }
     .filter-chips { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
     .filter-chips::-webkit-scrollbar { display:none; }
-    .filter-chip { background:#1a1a1a; border:1px solid #2a2a2a; color:#666; border-radius:20px; padding:7px 14px; font-size:12px; font-weight:500; cursor:pointer; white-space:nowrap; flex-shrink:0; }
-    .filter-chip.active { background:#1a1a2a; border-color:#6366f1; color:#818cf8; }
+    .filter-chip { background:var(--surface); border:1px solid var(--border); color:var(--text-2); border-radius:20px; padding:7px 14px; font-size:12px; font-weight:500; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+    .filter-chip.active { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
 
-    /* Perfil */
+    /* ── PERFIL ── */
     .perfil-avatar {
-      width: 64px; height: 64px; background: #1e1e2e; border: 2px solid #6366f1;
+      width: 64px; height: 64px; background: var(--accent-soft); border: 2px solid var(--accent);
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
       font-size: 28px; margin: 0 auto 20px;
     }
     .perfil-section { margin-bottom: 24px; }
     .perfil-section-title {
-      font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase;
+      font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase;
       letter-spacing: 0.08em; margin-bottom: 12px; padding-bottom: 8px;
-      border-bottom: 1px solid #1e1e1e;
+      border-bottom: 1px solid var(--border);
       display: flex; justify-content: space-between; align-items: center;
     }
     .card-item {
       display: flex; align-items: center; padding: 14px;
-      background: #141414; border: 1px solid #1e1e1e; border-radius: 12px; margin-bottom: 8px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px;
     }
     .card-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-right: 12px; }
     .card-info { flex: 1; min-width: 0; }
-    .card-name { font-size: 14px; font-weight: 600; color: #e0e0e0; }
-    .card-meta { font-size: 12px; color: #555; margin-top: 2px; }
+    .card-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+    .card-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
     .card-actions { display: flex; gap: 4px; }
     .btn-card-act {
-      background: none; border: 1px solid #2a2a2a; color: #666; border-radius: 8px;
+      background: none; border: 1px solid var(--border); color: var(--text-2); border-radius: 8px;
       padding: 6px 10px; font-size: 13px; cursor: pointer; min-height: 36px;
     }
-    .btn-card-act:hover { border-color: #6366f1; color: #818cf8; }
-    .btn-card-del:hover { border-color: #ef4444 !important; color: #ef4444 !important; }
+    .btn-card-act:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-card-del:hover { border-color: var(--red) !important; color: var(--red) !important; }
     .btn-add-card {
-      width: 100%; background: transparent; border: 1px dashed #2a2a2a; color: #555;
-      border-radius: 12px; padding: 14px; font-size: 13px; cursor: pointer;
+      width: 100%; background: transparent; border: 1px dashed var(--border); color: var(--text-3);
+      border-radius: var(--radius); padding: 14px; font-size: 13px; cursor: pointer;
       margin-top: 6px; min-height: 48px;
     }
-    .btn-add-card:hover { border-color: #6366f1; color: #818cf8; }
+    .btn-add-card:hover { border-color: var(--accent); color: var(--accent); }
     .cat-item {
       display: flex; align-items: center; gap: 10px; padding: 12px 0;
-      border-bottom: 1px solid #1a1a1a;
+      border-bottom: 1px solid var(--border);
     }
     .cat-emoji { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; }
-    .cat-name { flex: 1; font-size: 14px; font-weight: 500; color: #e0e0e0; }
+    .cat-name { flex: 1; font-size: 14px; font-weight: 500; color: var(--text-1); }
     .cat-actions { display: flex; gap: 6px; }
     .emoji-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
     .emoji-opt { font-size: 20px; cursor: pointer; padding: 4px; border-radius: 6px; border: 1px solid transparent; }
-    .emoji-opt:hover { border-color: #6366f1; background: #1e1e2e; }
-    .emoji-opt.sel { border-color: #6366f1; background: #1e1e2e; }
-    /* Income section */
+    .emoji-opt:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .emoji-opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+
+    /* ── RECEITAS ── */
     .income-section {
-      background: #111; border: 1px solid #1e1e1e; border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 14px 16px; margin-bottom: 16px;
     }
     .income-section-header {
@@ -428,57 +501,57 @@
     }
     .income-item {
       display: flex; align-items: center; gap: 10px;
-      padding: 8px 0; border-bottom: 1px solid #1a1a1a;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
     }
     .income-item:last-child { border-bottom: none; }
     .income-info { flex: 1; }
-    .income-desc { font-size: 14px; color: #e0e0e0; }
-    .income-date { font-size: 11px; color: #555; margin-top: 2px; }
-    .income-val { font-size: 14px; font-weight: 700; color: #4ade80; white-space: nowrap; }
+    .income-desc { font-size: 14px; color: var(--text-1); }
+    .income-date { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+    .income-val { font-size: 14px; font-weight: 700; color: var(--green); white-space: nowrap; }
     .income-total-row {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 10px 0 0; border-top: 1px solid #1e1e1e; margin-top: 8px;
-      font-size: 13px; color: #aaa;
+      padding: 10px 0 0; border-top: 1px solid var(--border); margin-top: 8px;
+      font-size: 13px; color: var(--text-2);
     }
 
-    /* Modal (bottom sheet) */
+    /* ── MODAL ── */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
       display: flex; align-items: flex-end; justify-content: center;
       z-index: 150;
     }
     .modal-overlay.hidden { display: none; }
     .modal {
-      background: #141414; border: 1px solid #2a2a2a;
+      background: var(--bg); border: 1px solid var(--border);
       border-radius: 20px 20px 0 0; padding: 8px 20px 32px;
       width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
     }
-    .modal-handle { width: 40px; height: 4px; background: #333; border-radius: 99px; margin: 12px auto 20px; }
-    .modal-title { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 20px; }
+    .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 99px; margin: 12px auto 20px; }
+    .modal-title { font-size: 17px; font-weight: 700; color: var(--text-1); margin-bottom: 20px; }
     .modal-footer { display: flex; gap: 10px; margin-top: 20px; }
     .btn-cancel {
-      flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; color: #888;
+      flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--text-2);
       border-radius: 10px; padding: 14px; font-size: 14px; cursor: pointer; min-height: 48px;
     }
     .btn-save {
-      flex: 2; background: #6366f1; border: none; color: #fff;
+      flex: 2; background: var(--accent); border: none; color: #fff;
       border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 48px;
     }
-    .btn-save:hover { background: #4f46e5; }
+    .btn-save:hover { opacity: 0.9; }
 
-    /* Payment method grid */
+    /* ── MÉTODO PAGAMENTO ── */
     .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
     .method-opt {
-      padding: 12px 8px; background: #1a1a1a; border: 2px solid #2a2a2a;
-      border-radius: 10px; text-align: center; font-size: 12px; color: #888;
+      padding: 12px 8px; background: var(--surface); border: 2px solid var(--border);
+      border-radius: 10px; text-align: center; font-size: 12px; color: var(--text-2);
       cursor: pointer; transition: all 0.15s;
     }
-    .method-opt:hover { border-color: #444; }
-    .method-opt.selected { border-color: #6366f1; color: #818cf8; background: #1a1a2a; }
+    .method-opt:hover { border-color: var(--text-2); }
+    .method-opt.selected { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
     .method-opt-icon { font-size: 22px; margin-bottom: 4px; }
 
     .aviso {
-      background: #1a0a0a; border: 1px solid #3a1a1a; color: #f87171;
+      background: var(--red-bg); border: 1px solid var(--red); color: var(--red);
       border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.5; margin-bottom: 14px;
     }
     #aviso-global { padding: 0 16px; }
@@ -495,7 +568,15 @@
     <span class="mes-nav-label" id="mes-label">Carregando...</span>
     <button class="mes-nav-btn" onclick="navMes(+1)">›</button>
   </div>
-  <button class="btn-icon" onclick="recarregar()" id="btn-refresh">↻</button>
+  <div style="display:flex;gap:4px;align-items:center">
+    <button class="btn-icon" onclick="toggleTheme()" id="btn-theme" aria-label="Alternar tema" title="Alternar tema">
+      <svg id="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg id="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button class="btn-icon" onclick="recarregar()" id="btn-refresh" aria-label="Recarregar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
+  </div>
 </header>
 
 <div class="content">
@@ -520,23 +601,29 @@
 </div>
 
 <nav class="bottom-nav">
-  <button class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
-    <span class="nav-icon">📊</span><span>Dashboard</span>
+  <button class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')" aria-label="Dashboard">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="nav-pip"></span>
   </button>
-  <button class="nav-item" data-tab="planejamento" onclick="switchTab('planejamento')">
-    <span class="nav-icon">📋</span><span>Planej.</span>
+  <button class="nav-item" data-tab="planejamento" onclick="switchTab('planejamento')" aria-label="Planejamento">
+    <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    <span class="nav-pip"></span>
   </button>
-  <button class="nav-item" data-tab="pagar" onclick="switchTab('pagar')">
-    <span class="nav-icon">🔔</span><span>Pagar</span>
+  <button class="nav-item" data-tab="pagar" onclick="switchTab('pagar')" aria-label="A Pagar">
+    <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <span class="nav-pip"></span>
   </button>
-  <button class="nav-item" data-tab="gastos" onclick="switchTab('gastos')">
-    <span class="nav-icon">💸</span><span>Gastos</span>
+  <button class="nav-item" data-tab="gastos" onclick="switchTab('gastos')" aria-label="Gastos">
+    <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    <span class="nav-pip"></span>
   </button>
-  <button class="nav-item" data-tab="faturas" onclick="switchTab('faturas')">
-    <span class="nav-icon">💳</span><span>Faturas</span>
+  <button class="nav-item" data-tab="faturas" onclick="switchTab('faturas')" aria-label="Faturas">
+    <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+    <span class="nav-pip"></span>
   </button>
-  <button class="nav-item" data-tab="perfil" onclick="switchTab('perfil')">
-    <span class="nav-icon">👤</span><span>Perfil</span>
+  <button class="nav-item" data-tab="perfil" onclick="switchTab('perfil')" aria-label="Perfil">
+    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span class="nav-pip"></span>
   </button>
 </nav>
 
@@ -575,6 +662,34 @@ let filtroGastosCat  = null;
 const fmt  = v => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtK = v => { const n = Number(v)||0; return n>=1000 ? `R$ ${(n/1000).toFixed(1)}k` : `R$ ${fmt(n)}`; };
 const esc  = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const current = root.getAttribute('data-theme');
+  const isDark = current === 'dark' || (!current && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const next = isDark ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  try { localStorage.setItem('theme', next); } catch(e) {}
+  updateThemeIcon();
+}
+
+function updateThemeIcon() {
+  const root = document.documentElement;
+  const current = root.getAttribute('data-theme');
+  const isDark = current === 'dark' || (!current && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const sun = document.getElementById('icon-sun');
+  const moon = document.getElementById('icon-moon');
+  if (sun && moon) { sun.style.display = isDark ? 'block' : 'none'; moon.style.display = isDark ? 'none' : 'block'; }
+}
+
+(function initTheme() {
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
+  } catch(e) {}
+  document.addEventListener('DOMContentLoaded', updateThemeIcon);
+  setTimeout(updateThemeIcon, 0);
+})();
 
 function showToast(msg, type='', showRetry=false) {
   document.getElementById('toast-msg').textContent = msg;
@@ -802,8 +917,19 @@ function renderDashboard() {
   });
 
   el.innerHTML = `
+    <div class="hero">
+      <div class="hero-eyebrow">Sobra Real</div>
+      <div class="hero-number ${realClass}">R$ ${fmt(sobraReal)}</div>
+      <div class="hero-sub">Entradas − gastos lançados</div>
+      <div class="hero-chips">
+        <span class="hero-chip">Entradas R$ ${fmt(totalEntradas)}</span>
+        <span class="hero-chip ${projClass}">Projetada R$ ${fmt(sobraProjetada)}</span>
+      </div>
+    </div>
+    <div class="hero-divider"></div>
+
     ${overBudget.length > 0 ? `
-      <div class="sec-title">⚠ Acima do teto</div>
+      <div class="sec-title">Acima do teto</div>
       ${overBudget.map(([n,d]) => {
         const lim = getLimitForCategory(d.catId);
         return `<div class="alert-item"><span class="name">${esc(d.emoji||'•')} ${esc(n)}</span><span class="val">+R$ ${fmt(d.spent-lim)}</span></div>`;
@@ -813,25 +939,13 @@ function renderDashboard() {
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-label">Entradas previstas</div>
-        <div class="kpi-value" style="font-size:20px">R$ ${fmt(totalEntradas)}</div>
+        <div class="kpi-value" style="font-size:18px">R$ ${fmt(totalEntradas)}</div>
         <div class="kpi-sub">Mês anterior: R$ ${fmt(totalPrevEntradas)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Comprometido</div>
-        <div class="kpi-value" style="font-size:20px">${fmtK(totalComprometido)}</div>
+        <div class="kpi-value" style="font-size:18px">${fmtK(totalComprometido)}</div>
         <div class="kpi-sub">Pago: R$ ${fmt(totalPago)}</div>
-      </div>
-    </div>
-    <div class="kpi-grid" style="margin-top:8px">
-      <div class="kpi-card highlight">
-        <div class="kpi-label">Sobra Projetada</div>
-        <div class="kpi-value ${projClass}">R$ ${fmt(sobraProjetada)}</div>
-        <div class="kpi-sub">Entradas − Comprometido</div>
-      </div>
-      <div class="kpi-card highlight">
-        <div class="kpi-label">Sobra Real</div>
-        <div class="kpi-value ${realClass}">R$ ${fmt(sobraReal)}</div>
-        <div class="kpi-sub">Entradas − Gasto real até agora</div>
       </div>
     </div>
 
@@ -897,10 +1011,21 @@ function renderPlanejamento() {
     </div>`).join('');
 
   el.innerHTML = `
+    <div class="hero">
+      <div class="hero-eyebrow">Total Comprometido</div>
+      <div class="hero-number red">R$ ${fmt(totalComprometido)}</div>
+      <div class="hero-sub">${commitments.length} contas planejadas</div>
+      <div class="hero-chips">
+        <span class="hero-chip green">Entradas R$ ${fmt(totalEntradas)}</span>
+        <span class="hero-chip ${sobraClass}">Sobra R$ ${fmt(sobra)}</span>
+      </div>
+    </div>
+    <div class="hero-divider"></div>
+
     <div class="plan-header">
       <div class="plan-title">Planejamento</div>
       <div style="display:flex;gap:8px">
-        <button class="btn-nova" style="background:#1a1a1a;color:#555;font-size:12px" onclick="limparDuplicados()">🧹 Dupl.</button>
+        <button class="btn-nova" style="background:var(--surface2);color:var(--text-2);font-size:12px" onclick="limparDuplicados()">🧹 Dupl.</button>
         <button class="btn-nova" onclick="abrirModalNovaConta()">+ Nova</button>
       </div>
     </div>
@@ -909,15 +1034,15 @@ function renderPlanejamento() {
       <div class="income-section-header">
         <div>
           <span style="font-weight:700">💰 Entradas de ${MESES[mesAtual-1]}</span>
-          <div style="font-size:11px;color:#555;margin-top:2px">Valor que cai em ${MESES[proxM-1]} ${proxA !== anoAtual ? proxA : ''}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px">Valor que cai em ${MESES[proxM-1]} ${proxA !== anoAtual ? proxA : ''}</div>
         </div>
         <button class="btn-nova" style="font-size:12px;padding:8px 14px" onclick="abrirIncomeModal()">+ Adicionar</button>
       </div>
-      ${incomeHtml || '<div style="font-size:12px;color:#444;padding:8px 0">Nenhuma entrada cadastrada</div>'}
+      ${incomeHtml || '<div style="font-size:12px;color:var(--text-3);padding:8px 0">Nenhuma entrada cadastrada</div>'}
       ${incomeEntries.length > 0 ? `
         <div class="income-total-row">
           <span>Total entradas</span>
-          <span style="font-weight:700;color:#4ade80">R$ ${fmt(totalEntradas)}</span>
+          <span style="font-weight:700;color:var(--green)">R$ ${fmt(totalEntradas)}</span>
         </div>
         <div class="income-total-row" style="border-top:none;padding-top:0">
           <span>Sobra projetada</span>
@@ -995,7 +1120,7 @@ function buildContaCard(c) {
           ${badgeMap[status]||''}${defPmBadge}
         </div>
         <div class="conta-right">
-          <div class="conta-val ${isPaid&&diff>0.005?'red':''}" style="font-size:${isPaid?'12px':'16px'};${isPaid?'color:#666':''}">Prev. R$ ${fmt(plan)}</div>
+          <div class="conta-val ${isPaid&&diff>0.005?'red':''}" style="font-size:${isPaid?'12px':'16px'};${isPaid?'color:var(--text-2)':''}">Prev. R$ ${fmt(plan)}</div>
           ${isPaid?`<div class="conta-val">R$ ${fmt(paid)}</div>`:''}
           ${paid>0&&!isPaid?`<div class="conta-paid">Pago: R$ ${fmt(paid)}</div>`:''}
           ${rem>0.005?`<div class="conta-rem">Falta: R$ ${fmt(rem)}</div>`:''}
@@ -1042,7 +1167,7 @@ async function abrirPagamentoModal(id) {
     .select('*').eq('commitment_id', id).order('payment_date');
 
   const pagListHtml = (pagamentos||[]).length ? `
-    <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pagamentos registrados</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pagamentos registrados</div>
     ${(pagamentos||[]).map(pg => {
       const pm = paymentMethods.find(p => p.id===pg.payment_method_id);
       const dataFmt = pg.payment_date ? new Date(pg.payment_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '';
@@ -1056,21 +1181,21 @@ async function abrirPagamentoModal(id) {
     }).join('')}
     <div style="border-top:1px solid #1a1a1a;margin:12px 0"></div>` : '';
 
-  const paidInfo = paid > 0.005 ? `<span style="color:#555"> · já pago: R$ ${fmt(paid)}</span>` : '';
+  const paidInfo = paid > 0.005 ? `<span style="color:var(--text-3)"> · já pago: R$ ${fmt(paid)}</span>` : '';
 
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Pagamento</div>
-    <div style="font-size:14px;color:#aaa;margin-bottom:4px">${esc(c.name)}</div>
-    <div style="font-size:12px;color:#555;margin-bottom:16px">Previsto: <strong style="color:#e0e0e0">R$ ${fmt(plan)}</strong>${paidInfo}</div>
+    <div style="font-size:14px;color:var(--text-2);margin-bottom:4px">${esc(c.name)}</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:16px">Previsto: <strong style="color:var(--text-1)">R$ ${fmt(plan)}</strong>${paidInfo}</div>
     ${pagListHtml}
     <div class="field">
       <label>Valor pago (R$)</label>
       <input type="number" id="pay-val" value="${sugestao}" step="0.01" min="0.01" inputmode="decimal" />
     </div>
-    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pago com</div>
-    <div class="method-grid">${pmOpts || '<div style="color:#555;font-size:13px;padding:8px">Nenhum método cadastrado</div>'}</div>
-    <div id="credit-note" style="display:none;background:#1a1a2a;border:1px solid #2a2a3a;border-radius:10px;padding:10px 14px;font-size:12px;color:#818cf8;margin-bottom:12px">
+    <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pago com</div>
+    <div class="method-grid">${pmOpts || '<div style="color:var(--text-3);font-size:13px;padding:8px">Nenhum método cadastrado</div>'}</div>
+    <div id="credit-note" style="display:none;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:12px">
       💳 Lançado na fatura do cartão (próximo mês).
     </div>
     <div class="modal-footer">
@@ -1168,7 +1293,7 @@ function abrirEditarCommitment(id) {
       <div class="field"><label>Valor (R$)</label><input type="number" id="edit-valor" value="${Number(c.planned_amount).toFixed(2)}" step="0.01" /></div>
       <div class="field"><label>Dia vencimento</label><input type="number" id="edit-dia" value="${c.due_day||''}" min="1" max="31" /></div>
     </div>
-    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
+    <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
     <div class="rec-toggle">
       <div class="rec-opt ${recType==='automatico'?'sel-auto':''}" id="edit-rec-auto" onclick="selecionarRec('edit','automatico')">
         <span class="rec-opt-icon">🤖</span><span class="rec-opt-label">Automático</span><span class="rec-opt-hint">débita sozinho</span>
@@ -1182,36 +1307,36 @@ function abrirEditarCommitment(id) {
     </div>
     <input type="hidden" id="edit-recurrence" value="${esc(recType)}" />
     <div id="edit-repeat-section" style="margin-bottom:12px;${recType==='pontual'?'display:none':''}">
-      <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Repetição / Parcelas</div>
-      <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px">
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
+      <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Repetição / Parcelas</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer">
           <input type="radio" name="edit-rep" value="unico" checked onchange="onEditRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
           Só este mês
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
-          <input type="radio" name="edit-rep" value="repetir" onchange="onEditRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="edit-rep" value="repetir" onchange="onEditRepChange()" style="accent-color:var(--accent);width:16px;height:16px" />
           Repetir por mais
           <input type="number" id="edit-meses" min="1" max="60" value="6" disabled
-            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+            style="width:55px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text-1);font-size:14px;text-align:center" />
           meses
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
-          <input type="radio" name="edit-rep" value="parcelar" onchange="onEditRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="edit-rep" value="parcelar" onchange="onEditRepChange()" style="accent-color:var(--accent);width:16px;height:16px" />
           Em mais
           <input type="number" id="edit-parcelas" min="1" max="60" value="6" disabled
-            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+            style="width:55px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text-1);font-size:14px;text-align:center" />
           parcelas
         </label>
       </div>
     </div>
-    <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
-        <input type="checkbox" id="edit-auto-toggle" onchange="toggleAutoCardEdit()" ${autoOn?'checked':''} style="width:18px;height:18px;accent-color:#6366f1" />
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer">
+        <input type="checkbox" id="edit-auto-toggle" onchange="toggleAutoCardEdit()" ${autoOn?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)" />
         Cobrado direto no cartão de crédito
       </label>
       <div id="edit-card-row" style="display:${autoOn?'block':'none'};margin-top:12px">
-        <label style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Cartão</label>
-        <select id="edit-card" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:12px 14px;color:#f0f0f0;font-size:16px">
+        <label style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Cartão</label>
+        <select id="edit-card" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text-1);font-size:16px">
           ${cardOpts || '<option value="">Nenhum cartão de crédito cadastrado</option>'}
         </select>
       </div>
@@ -1320,7 +1445,7 @@ function abrirModalNovaConta() {
       <div class="field"><label>Valor (R$)</label><input type="number" id="nc-valor" step="0.01" placeholder="0,00" /></div>
       <div class="field"><label>Dia vencimento</label><input type="number" id="nc-dia" min="1" max="31" placeholder="Ex: 10" /></div>
     </div>
-    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
+    <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
     <div class="rec-toggle">
       <div class="rec-opt sel-auto" id="nc-rec-auto" onclick="selecionarRec('nc','automatico')">
         <span class="rec-opt-icon">🤖</span>
@@ -1340,36 +1465,36 @@ function abrirModalNovaConta() {
     </div>
     <input type="hidden" id="nc-recurrence" value="automatico" />
     <div id="nc-repeat-section" style="margin-bottom:12px">
-      <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Repetição</div>
-      <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px">
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
-          <input type="radio" name="nc-rep" value="unico" checked onchange="onRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+      <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Repetição</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer">
+          <input type="radio" name="nc-rep" value="unico" checked onchange="onRepChange()" style="accent-color:var(--accent);width:16px;height:16px" />
           Só este mês
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
-          <input type="radio" name="nc-rep" value="repetir" onchange="onRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="nc-rep" value="repetir" onchange="onRepChange()" style="accent-color:var(--accent);width:16px;height:16px" />
           Repetir por
           <input type="number" id="nc-meses" min="2" max="60" value="12" disabled
-            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+            style="width:55px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text-1);font-size:14px;text-align:center" />
           meses
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer;flex-wrap:wrap">
-          <input type="radio" name="nc-rep" value="parcelar" onchange="onRepChange()" style="accent-color:#6366f1;width:16px;height:16px" />
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
+          <input type="radio" name="nc-rep" value="parcelar" onchange="onRepChange()" style="accent-color:var(--accent);width:16px;height:16px" />
           Em
           <input type="number" id="nc-parcelas" min="2" max="60" value="12" disabled
-            style="width:55px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;color:#f0f0f0;font-size:14px;text-align:center" />
+            style="width:55px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text-1);font-size:14px;text-align:center" />
           parcelas
         </label>
       </div>
     </div>
-    <div style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:14px;margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:#ccc;cursor:pointer">
-        <input type="checkbox" id="nc-auto-toggle" onchange="toggleAutoCard()" style="width:18px;height:18px;accent-color:#6366f1" />
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer">
+        <input type="checkbox" id="nc-auto-toggle" onchange="toggleAutoCard()" style="width:18px;height:18px;accent-color:var(--accent)" />
         Cobrado direto no cartão de crédito
       </label>
       <div id="nc-card-row" style="display:none;margin-top:12px">
-        <label style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Cartão</label>
-        <select id="nc-card" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:12px 14px;color:#f0f0f0;font-size:16px">
+        <label style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Cartão</label>
+        <select id="nc-card" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text-1);font-size:16px">
           ${cardOpts || '<option value="">Nenhum cartão de crédito cadastrado</option>'}
         </select>
       </div>
@@ -1487,13 +1612,12 @@ function renderPagar() {
   }).join('');
 
   el.innerHTML = `
-    <div class="contas-top-row">
-      <div class="contas-top-title">Pagamentos</div>
+    <div class="hero">
+      <div class="hero-eyebrow">Total a Pagar</div>
+      <div class="hero-number ${totalFaltante > 0 ? 'red' : 'green'}">R$ ${fmt(totalFaltante)}</div>
+      <div class="hero-sub">${qtdQuitadas} de ${pagarCmts.length} contas pagas</div>
     </div>
-    <div class="contas-summary">
-      <div class="cs-card"><div class="cs-label">A pagar</div><div class="cs-val red">R$ ${fmt(totalFaltante)}</div></div>
-      <div class="cs-card"><div class="cs-label">Pagas</div><div class="cs-val green">${qtdQuitadas} / ${pagarCmts.length}</div></div>
-    </div>
+    <div class="hero-divider"></div>
     ${cmtHtml || '<div class="empty-state"><div class="icon">✅</div>Nenhuma conta para pagar<br><small style="margin-top:8px;display:block">Adicione despesas manuais no Planejamento</small></div>'}
   `;
 }
@@ -1538,9 +1662,9 @@ function renderFaturas() {
           <div class="fatura-total">R$ ${fmt(total)}</div>
         </div>
         <div class="fatura-sub">Consumo de ${mesLabel(mesAtual,anoAtual)} · ${vencLabel}</div>
-        ${autoItems.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Automáticos</div>${autoRowsHtml}` : ''}
-        ${parceladoItems.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Parceladas</div>${parceladoRowsHtml}` : ''}
-        ${cardEntries.length ? `<div style="font-size:11px;color:#555;padding:4px 0 2px;font-weight:600">Gastos manuais por categoria</div>` : ''}
+        ${autoItems.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Automáticos</div>${autoRowsHtml}` : ''}
+        ${parceladoItems.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Parceladas</div>${parceladoRowsHtml}` : ''}
+        ${cardEntries.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Gastos manuais por categoria</div>` : ''}
         ${cardEntries.sort((a,b)=>Number(b.total_spent)-Number(a.total_spent)).map(s=>`
           <div class="fatura-cat-row">
             <span class="fatura-cat-name">${esc(s.category_emoji||'•')} ${esc(s.category_name)}</span>
@@ -1548,15 +1672,25 @@ function renderFaturas() {
           </div>`).join('')}
         <div class="fatura-total-row">
           <span>Total da fatura</span>
-          <span style="font-weight:700;color:#f0f0f0">R$ ${fmt(total)}</span>
+          <span style="font-weight:700;color:var(--text-1)">R$ ${fmt(total)}</span>
         </div>
       </div>`;
   }).filter(Boolean).join('');
 
+  const totalFaturas = creditCards.reduce((sum, card) => {
+    const cardEntries  = spendingSummary.filter(s => s.card_id===card.id);
+    const autoItems    = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
+    const parcelados   = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null);
+    return sum + cardEntries.reduce((s,x)=>s+Number(x.total_spent),0) + autoItems.reduce((s,c)=>s+Number(c.planned_amount),0) + parcelados.reduce((s,c)=>s+Number(c.planned_amount),0);
+  }, 0);
+
   el.innerHTML = `
-    <div class="contas-top-row">
-      <div class="contas-top-title">Faturas</div>
+    <div class="hero">
+      <div class="hero-eyebrow">Total das Faturas</div>
+      <div class="hero-number red">R$ ${fmt(totalFaturas)}</div>
+      <div class="hero-sub">${creditCards.length} cartão${creditCards.length!==1?'ões':''} ativo${creditCards.length!==1?'s':''}</div>
     </div>
+    <div class="hero-divider"></div>
     ${faturaHtml || '<div class="empty-state"><div class="icon">💳</div>Nenhum gasto no cartão de crédito este mês<br><small style="margin-top:8px;display:block">Registre gastos na aba Gastos usando o cartão</small></div>'}
   `;
 }
@@ -1596,6 +1730,13 @@ function renderGastos() {
   }).join('');
 
   el.innerHTML = `
+    <div class="hero">
+      <div class="hero-eyebrow">Gasto do Mês</div>
+      <div class="hero-number red">R$ ${fmt(totalGasto)}</div>
+      <div class="hero-sub">${spendingEntries.length} lançamento${spendingEntries.length!==1?'s':''}</div>
+    </div>
+    <div class="hero-divider"></div>
+
     <div class="gastos-form">
       <div class="gastos-form-title">Registrar gasto</div>
       <div class="field-row">
@@ -1620,8 +1761,8 @@ function renderGastos() {
         <input type="text" id="g-desc" placeholder="Detalhes adicionais..." />
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:6px 0 2px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#888;font-size:13px;user-select:none">
-          <input type="checkbox" id="toggle-parc" onchange="toggleParc()" style="width:16px;height:16px;accent-color:#818cf8;cursor:pointer" />
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text-2);font-size:13px;user-select:none">
+          <input type="checkbox" id="toggle-parc" onchange="toggleParc()" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer" />
           💳 Parcelado?
         </label>
       </div>
@@ -1631,7 +1772,7 @@ function renderGastos() {
             <input type="number" id="g-parcelas" value="2" min="2" max="48" oninput="atualizarParcPreview()" />
           </div>
           <div class="field" style="justify-content:flex-end;align-items:flex-end">
-            <div id="parc-preview" style="color:#818cf8;font-size:12px;padding-bottom:10px;text-align:right"></div>
+            <div id="parc-preview" style="color:var(--accent);font-size:12px;padding-bottom:10px;text-align:right"></div>
           </div>
         </div>
       </div>
@@ -1823,18 +1964,18 @@ function renderPerfil() {
         <span>Categorias</span>
         <button class="btn-nova" style="font-size:12px;padding:8px 14px" onclick="abrirCatModal()">+ Nova</button>
       </div>
-      ${catsHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhuma categoria. Crie a primeira!</div>'}
+      ${catsHtml || '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:20px 0">Nenhuma categoria. Crie a primeira!</div>'}
     </div>
     <div class="perfil-section">
       <div class="perfil-section-title">Tetos de gastos</div>
-      ${tetosHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Crie categorias primeiro</div>'}
+      ${tetosHtml || '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:20px 0">Crie categorias primeiro</div>'}
     </div>
     <div class="perfil-section">
       <div class="perfil-section-title">
         <span>Meus cartões</span>
         <button class="btn-nova" style="font-size:12px;padding:8px 14px" onclick="abrirCartaoModal()">+ Novo</button>
       </div>
-      ${cardsHtml || '<div style="font-size:13px;color:#444;text-align:center;padding:20px 0">Nenhum cartão cadastrado</div>'}
+      ${cardsHtml || '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:20px 0">Nenhum cartão cadastrado</div>'}
     </div>
   `;
 }
@@ -1903,7 +2044,7 @@ function editarAutomatico(id, nome, valorAtual) {
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Editar automático</div>
-    <div style="font-size:13px;color:#aaa;margin-bottom:12px">${esc(nome)}</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">${esc(nome)}</div>
     <div class="field"><label>Valor (R$)</label>
       <input type="number" id="auto-valor" value="${valorAtual}" min="0" step="0.01" inputmode="decimal" />
     </div>
@@ -2072,7 +2213,7 @@ function abrirTetoModal(catId) {
       <label>Limite mensal (R$)</label>
       <input type="number" id="teto-valor" value="${valorAtual}" step="0.01" min="0" placeholder="Ex: 1500,00" inputmode="decimal" />
     </div>
-    <p style="font-size:12px;color:#555;margin-bottom:12px">Deixe vazio ou zero para remover o teto.</p>
+    <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Deixe vazio ou zero para remover o teto.</p>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
       <button class="btn-save" onclick="salvarTeto()">Salvar</button>
@@ -2116,37 +2257,37 @@ function abrirCatDrilldown(catId, catName) {
   const totalCat    = totalAuto + totalManual;
 
   const commitRowsHtml = catCommitments.length ? `
-    <div style="font-size:11px;color:#555;font-weight:600;padding:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">Comprometido</div>
+    <div style="font-size:11px;color:var(--text-3);font-weight:600;padding:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">Comprometido</div>
     ${catCommitments.map(c => `
-      <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #1a1a1a">
-        <span style="font-size:13px;color:#aaa">${esc(c.name)}</span>
-        <span style="font-size:13px;color:#e0e0e0;font-weight:500">R$ ${fmt(c.planned_amount)}</span>
+      <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;color:var(--text-2)">${esc(c.name)}</span>
+        <span style="font-size:13px;color:var(--text-1);font-weight:500">R$ ${fmt(c.planned_amount)}</span>
       </div>`).join('')}` : '';
 
   const entryRowsHtml = catEntries.length ? `
-    <div style="font-size:11px;color:#555;font-weight:600;padding:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">Lançamentos</div>
+    <div style="font-size:11px;color:var(--text-3);font-weight:600;padding:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">Lançamentos</div>
     ${catEntries.map(e => {
       const pm = paymentMethods.find(p => p.id === e.payment_method_id);
       const dl = e.spend_date ? new Date(e.spend_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '';
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1a1a1a">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
           <div>
-            <div style="font-size:13px;color:#aaa">${esc(e.subcategory||e.description||'Gasto')}</div>
-            <div style="font-size:11px;color:#555">${dl}${pm?' · '+esc(pm.name):''}</div>
+            <div style="font-size:13px;color:var(--text-2)">${esc(e.subcategory||e.description||'Gasto')}</div>
+            <div style="font-size:11px;color:var(--text-3)">${dl}${pm?' · '+esc(pm.name):''}</div>
           </div>
-          <span style="font-size:13px;color:#e0e0e0;font-weight:500">R$ ${fmt(e.amount)}</span>
+          <span style="font-size:13px;color:var(--text-1);font-weight:500">R$ ${fmt(e.amount)}</span>
         </div>`;
     }).join('')}` : '';
 
   const emptyHtml = !catCommitments.length && !catEntries.length
-    ? '<div style="text-align:center;color:#555;padding:24px 0;font-size:13px">Nenhum lançamento nesta categoria</div>' : '';
+    ? '<div style="text-align:center;color:var(--text-3);padding:24px 0;font-size:13px">Nenhum lançamento nesta categoria</div>' : '';
 
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">${esc(cat?.emoji||'•')} ${esc(catName)}</div>
     <div style="text-align:center;padding:4px 0 14px">
-      <div style="font-size:26px;font-weight:700;color:#f0f0f0">R$ ${fmt(totalCat)}</div>
-      <div style="font-size:12px;color:#555;margin-top:2px">total no mês</div>
+      <div style="font-size:26px;font-weight:700;color:var(--text-1)">R$ ${fmt(totalCat)}</div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:2px">total no mês</div>
     </div>
     ${commitRowsHtml}${entryRowsHtml}${emptyHtml}
     <div class="modal-footer">
