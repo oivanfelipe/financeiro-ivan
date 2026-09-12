@@ -208,6 +208,7 @@
     .pace-badge.ok   { color: var(--green); }
     .pace-badge.warn { color: var(--amber); }
     .pace-badge.over { color: var(--red); }
+    .sem-teto-badge  { color: var(--text-3); font-weight: 500; }
     .pace-amounts { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
 
     .top-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -1052,11 +1053,13 @@ function renderDashboard() {
   const realClass = sobraReal >= 0 ? 'green' : 'red';
 
   const spendByCat = {};
-  // Gastos manuais lançados (reais)
-  spendingSummary.forEach(s => {
-    if (!spendByCat[s.category_name])
-      spendByCat[s.category_name] = { spent: 0, catId: s.category_id, cat: categories.find(c => c.id === s.category_id) };
-    spendByCat[s.category_name].spent += Number(s.total_spent);
+  // Gastos manuais lançados — usa spendingEntries diretamente para não perder categorias sem teto
+  spendingEntries.forEach(e => {
+    const cat = categories.find(c => c.id === e.category_id);
+    const key = cat ? cat.name : 'Sem categoria';
+    const catRef = cat || { id: e.category_id, name: key };
+    if (!spendByCat[key]) spendByCat[key] = { spent: 0, catId: e.category_id, cat: catRef };
+    spendByCat[key].spent += Number(e.amount);
   });
   // Automáticos (recurrence_type='automatico', due_day=null): cobranças que ocorrem todo mês
   // sem entrada manual — Netflix, Spotify etc. Planejados (manual/pontual) são o TETO, não o gasto.
@@ -1088,7 +1091,21 @@ function renderDashboard() {
       </div>`;
   }).join('');
 
-  const sorted = Object.entries(spendByCat).sort((a,b) => b[1].spent - a[1].spent).slice(0,5);
+  // Categorias com gastos reais mas sem teto definido
+  const budgetCatIds = new Set(catsWithBudget.map(c => c.id));
+  const semTetoHtml = Object.entries(spendByCat)
+    .filter(([, d]) => d.spent > 0 && !budgetCatIds.has(d.catId))
+    .sort((a, b) => b[1].spent - a[1].spent)
+    .map(([name, d]) => `
+      <div class="pace-card sem-teto" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(d.catId)}','${esc(name)}')">
+        <div class="pace-header">
+          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(d.cat,'sm')} ${esc(name)}</div>
+          <div class="pace-badge sem-teto-badge">sem teto</div>
+        </div>
+        <div class="pace-amounts"><span>R$ ${fmt(d.spent)}</span></div>
+      </div>`).join('');
+
+  const sorted = Object.entries(spendByCat).sort((a,b) => b[1].spent - a[1].spent);
   const maxSpent = sorted.length ? sorted[0][1].spent : 1;
   const topHtml = sorted.map(([name, d], i) => `
     <div class="top-row" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(d.catId)}','${esc(name)}')">
@@ -1136,8 +1153,8 @@ function renderDashboard() {
       </div>
     </div>
 
-    ${catsWithBudget.length > 0 ? `<div class="sec-title">Pace por categoria</div>${paceHtml}` : ''}
-    ${sorted.length > 0 ? `<div class="sec-title">Top gastos do mês</div>${topHtml}` : ''}
+    ${(catsWithBudget.length > 0 || semTetoHtml) ? `<div class="sec-title">Pace por categoria</div>${paceHtml}${semTetoHtml}` : ''}
+    ${sorted.length > 0 ? `<div class="sec-title">Todos os gastos</div>${topHtml}` : ''}
   `;
 }
 
