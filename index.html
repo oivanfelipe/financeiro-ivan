@@ -306,6 +306,12 @@
       padding: 13px 14px; margin-bottom: 7px;
       display: flex; align-items: center; gap: 10px;
     }
+    .cat-avatar {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: #fff;
+    }
+    .cat-avatar.sm { width: 28px; height: 28px; border-radius: 8px; font-size: 14px; }
     .plan-emoji { font-size: 20px; flex-shrink: 0; }
     .plan-info  { flex: 1; min-width: 0; }
     .plan-name  { font-size: 14px; font-weight: 600; color: var(--text-1); }
@@ -407,7 +413,7 @@
       padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); margin-bottom: 6px;
     }
-    .gasto-emoji { font-size: 20px; flex-shrink: 0; }
+    .gasto-emoji { flex-shrink: 0; }
     .gasto-info { flex: 1; min-width: 0; }
     .gasto-desc { font-size: 14px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .gasto-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
@@ -687,6 +693,20 @@ const esc  = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 const ICO_TRASH    = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
 const ICO_PENCIL   = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+const CAT_PALETTE = ['#7C3AED','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#84CC16','#F97316','#EC4899','#6366F1','#14B8A6'];
+function catColor(idOrName) {
+  const s = String(idOrName||'');
+  let h = 0; for (let i=0;i<s.length;i++) h = (h*31+s.charCodeAt(i))>>>0;
+  return CAT_PALETTE[h % CAT_PALETTE.length];
+}
+function catAvatar(cat, size='') {
+  const bg  = catColor(cat?.id || cat?.name || '?');
+  const cls = size === 'sm' ? 'cat-avatar sm' : 'cat-avatar';
+  if (cat?.emoji) return `<div class="${cls}" style="background:${bg}">${esc(cat.emoji)}</div>`;
+  const letter = (cat?.name||'?')[0].toUpperCase();
+  return `<div class="${cls}" style="background:${bg}">${letter}</div>`;
+}
+
 const ICO_REC_AUTO = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
 const ICO_REC_BELL = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
 const ICO_REC_CAL  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
@@ -921,7 +941,7 @@ function renderDashboard() {
     return `
       <div class="pace-card" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(cat.id)}','${esc(cat.name)}')">
         <div class="pace-header">
-          <div class="pace-name">${esc(cat.emoji||'•')} ${esc(cat.name)}</div>
+          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(cat,'sm')} ${esc(cat.name)}</div>
           <div class="pace-badge ${badgeClass}">${badgeText}</div>
         </div>
         <div class="pace-amounts"><span>R$ ${fmt(spent)}</span><span>Teto: R$ ${fmt(lim)}</span></div>
@@ -993,7 +1013,6 @@ function renderPlanejamento() {
 
   function buildPlanCard(c) {
     const cat   = categories.find(x => x.id === c.category_id);
-    const emoji = cat?.emoji || '·';
     const badge = c.recurrence_type === 'automatico'
       ? `<span class="badge badge-auto">Automático</span>`
       : c.recurrence_type === 'pontual'
@@ -1002,7 +1021,7 @@ function renderPlanejamento() {
     const dayLabel = c.due_day ? `Dia ${c.due_day}` : 'Sem vencimento';
     return `
       <div class="plan-card">
-        <div class="plan-emoji">${esc(emoji)}</div>
+        ${catAvatar(cat)}
         <div class="plan-info">
           <div class="plan-name">${esc(c.name)}</div>
           <div class="plan-meta">${esc(c.category_name||'')}${c.category_name?' · ':''}${dayLabel}</div>
@@ -1144,7 +1163,7 @@ function buildContaCard(c) {
       <div class="conta-top">
         <div class="conta-left">
           <div class="conta-name">${esc(c.name)}</div>
-          <div class="conta-meta">${c.category_name ? esc(c.category_emoji||'')+ ' ' +esc(c.category_name) : ''}${c.due_day?' · Dia '+c.due_day:''}${c.type==='parcelado'&&c.installment_current?` · ${c.installment_current}/${c.installment_total}`:''}</div>
+          <div class="conta-meta">${c.category_name ? esc(c.category_name) : ''}${c.due_day?' · Dia '+c.due_day:''}${c.type==='parcelado'&&c.installment_current?` · ${c.installment_current}/${c.installment_total}`:''}</div>
           ${badgeMap[status]||''}${defPmBadge}
         </div>
         <div class="conta-right">
@@ -1695,7 +1714,7 @@ function renderFaturas() {
         ${cardEntries.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Gastos manuais por categoria</div>` : ''}
         ${cardEntries.sort((a,b)=>Number(b.total_spent)-Number(a.total_spent)).map(s=>`
           <div class="fatura-cat-row">
-            <span class="fatura-cat-name">${esc(s.category_emoji||'•')} ${esc(s.category_name)}</span>
+            <span class="fatura-cat-name" style="display:flex;align-items:center;gap:6px">${catAvatar(categories.find(c=>c.id===s.category_id),'sm')} ${esc(s.category_name)}</span>
             <span class="fatura-cat-val">R$ ${fmt(s.total_spent)}</span>
           </div>`).join('')}
         <div class="fatura-total-row">
@@ -1745,7 +1764,7 @@ function renderGastos() {
       const pm  = paymentMethods.find(p => p.id===e.payment_method_id);
       return `
         <div class="gasto-item">
-          <div class="gasto-emoji">${esc(cat?.emoji||'·')}</div>
+          <div class="gasto-emoji">${catAvatar(cat,'sm')}</div>
           <div class="gasto-info">
             <div class="gasto-desc">${esc(e.subcategory||e.description||cat?.name||'Gasto')}</div>
             <div class="gasto-meta">${esc(cat?.name||'')}${e.subcategory&&e.description?' · '+esc(e.description):''}${pm?' · '+esc(pm.name):''}</div>
@@ -1987,7 +2006,7 @@ function renderPerfil() {
 
   const catsHtml = categories.map(cat => `
     <div class="cat-item">
-      <span class="cat-emoji">${esc(cat.emoji||'•')}</span>
+      ${catAvatar(cat,'sm')}
       <span class="cat-name">${esc(cat.name)}</span>
       <div class="cat-actions">
         <button class="btn-card-act" onclick="abrirCatModal('${esc(cat.id)}')" style="display:flex;align-items:center;justify-content:center">${ICO_PENCIL}</button>
@@ -2000,7 +2019,7 @@ function renderPerfil() {
     const meta   = budget ? `Teto: R$ ${fmt(budget.limit_amount)}` : 'Sem teto';
     return `
       <div class="card-item">
-        <span style="font-size:20px;min-width:28px;text-align:center">${esc(cat.emoji||'•')}</span>
+        ${catAvatar(cat,'sm')}
         <div class="card-info">
           <div class="card-name">${esc(cat.name)}</div>
           <div class="card-meta">${meta}</div>
