@@ -545,6 +545,21 @@
     }
     .btn-save:hover { opacity: 0.9; }
 
+    /* ── SUBCAT DROPDOWN ── */
+    .subcat-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      z-index: 60; max-height: 220px; overflow-y: auto;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+    }
+    .subcat-opt {
+      padding: 13px 14px; font-size: 14px; color: var(--text-1); cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+    .subcat-opt:last-child { border-bottom: none; }
+    .subcat-opt:hover, .subcat-opt:active { background: var(--surface2); }
+    .subcat-opt.empty { color: var(--text-3); font-size: 13px; cursor: default; }
+
     /* ── MÉTODO PAGAMENTO ── */
     .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
     .method-opt {
@@ -1756,10 +1771,12 @@ function renderGastos() {
           <select id="g-cat" onchange="atualizarSubcatList()">${catOpts}</select>
         </div>
       </div>
-      <div class="field">
+      <div class="field" style="position:relative">
         <label>Subcategoria</label>
-        <input type="text" id="g-subcat" placeholder="Ex: Gasolina, Pedágio..." list="subcat-list" autocomplete="off" />
-        <datalist id="subcat-list"></datalist>
+        <input type="text" id="g-subcat" placeholder="Selecione ou digite..." autocomplete="off"
+               onfocus="mostrarSubcatDropdown()" oninput="filtrarSubcatDropdown(this.value)"
+               onblur="setTimeout(fecharSubcatDropdown,150)" />
+        <div id="subcat-dropdown" class="subcat-dropdown" style="display:none"></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Método</label><select id="g-pm">${pmOpts}</select></div>
@@ -1772,7 +1789,7 @@ function renderGastos() {
       <div style="display:flex;align-items:center;gap:10px;padding:6px 0 2px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text-2);font-size:13px;user-select:none">
           <input type="checkbox" id="toggle-parc" onchange="toggleParc()" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer" />
-          💳 Parcelado?
+          Parcelado?
         </label>
       </div>
       <div id="parc-opts" style="display:none">
@@ -1836,7 +1853,7 @@ function toggleParc() {
   const opts = document.getElementById('parc-opts');
   const btn  = document.getElementById('btn-gasto');
   if (opts) opts.style.display = checked ? 'block' : 'none';
-  if (btn)  btn.textContent   = checked ? '💳 Lançar parcelado' : '+ Registrar gasto';
+  if (btn)  btn.textContent   = checked ? 'Lançar parcelado' : '+ Registrar gasto';
   if (checked) atualizarParcPreview();
 }
 
@@ -1881,17 +1898,51 @@ async function addParcelado() {
   await loadMes();
 }
 
+let _subcatOpts = [];
+
 function atualizarSubcatList() {
   const catId = document.getElementById('g-cat')?.value;
-  const dl = document.getElementById('subcat-list');
-  if (!dl || !catId) return;
-  // Primeiro: nomes do Planejamento para essa categoria (o que foi planejado)
-  const fromPlan = commitments.filter(c => c.category_id===catId && c.name).map(c => c.name);
-  // Segundo: subcategorias já usadas em gastos anteriores
+  if (!catId) { _subcatOpts = []; return; }
+  const fromPlan  = commitments.filter(c => c.category_id===catId && c.name).map(c => c.name);
   const fromSpend = spendingEntries.filter(e => e.category_id===catId && e.subcategory).map(e => e.subcategory);
-  const known = [...new Set([...fromPlan, ...fromSpend])];
-  dl.innerHTML = known.map(s => `<option value="${esc(s)}">`).join('');
+  _subcatOpts = [...new Set([...fromPlan, ...fromSpend])];
+  fecharSubcatDropdown();
 }
+
+function mostrarSubcatDropdown() {
+  renderSubcatDropdown(document.getElementById('g-subcat')?.value || '');
+}
+
+function filtrarSubcatDropdown(val) {
+  renderSubcatDropdown(val);
+}
+
+function renderSubcatDropdown(filter) {
+  const dd = document.getElementById('subcat-dropdown');
+  if (!dd) return;
+  const q = filter.trim().toLowerCase();
+  const filtered = q ? _subcatOpts.filter(s => s.toLowerCase().includes(q)) : _subcatOpts;
+  if (!filtered.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = filtered.map(s =>
+    `<div class="subcat-opt" onmousedown="selecionarSubcat('${esc(s)}')">${esc(s)}</div>`
+  ).join('');
+  dd.style.display = 'block';
+}
+
+function selecionarSubcat(val) {
+  const inp = document.getElementById('g-subcat');
+  if (inp) { inp.value = val; }
+  fecharSubcatDropdown();
+}
+
+function fecharSubcatDropdown() {
+  const dd = document.getElementById('subcat-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.field')) fecharSubcatDropdown();
+});
 
 function setFiltroGastos(catId) {
   filtroGastosCat = catId;
