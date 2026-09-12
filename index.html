@@ -222,7 +222,7 @@
       padding: 10px 14px; background: var(--red-bg); border: 1px solid var(--red);
       border-radius: 10px; margin-bottom: 6px; font-size: 13px; opacity: 0.9;
     }
-    .alert-item .name { color: var(--red); }
+    .alert-item .name { color: var(--red); display: flex; align-items: center; gap: 6px; }
     .alert-item .val  { color: var(--red); font-weight: 600; }
 
     /* ── CONTAS ── */
@@ -722,12 +722,12 @@ function catColor(idOrName) {
   return CAT_PALETTE[h % CAT_PALETTE.length];
 }
 const CAT_ICON_MAP = [
-  ["melina", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15v7" /> <path d="M9 19h6" /> <circle cx="12" cy="9" r="6" /> </svg>`],
-  ["bem", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 3h5v5" /> <path d="m21 3-6.75 6.75" /> <circle cx="10" cy="14" r="6" /> </svg>`],
-  ["menina", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15v7" /> <path d="M9 19h6" /> <circle cx="12" cy="9" r="6" /> </svg>`],
-  ["menino", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 3h5v5" /> <path d="m21 3-6.75 6.75" /> <circle cx="10" cy="14" r="6" /> </svg>`],
-  ["filha", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15v7" /> <path d="M9 19h6" /> <circle cx="12" cy="9" r="6" /> </svg>`],
-  ["filho", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 3h5v5" /> <path d="m21 3-6.75 6.75" /> <circle cx="10" cy="14" r="6" /> </svg>`],
+  ["melina", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
+  ["bem", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
+  ["menina", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
+  ["menino", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
+  ["filha", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
+  ["filho", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
   ["casa", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg>`],
   ["moradia", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg>`],
   ["aluguel", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg>`],
@@ -791,6 +791,13 @@ const CAT_ICON_MAP = [
   ["netflix", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <line x1="6" x2="10" y1="11" y2="11" /> <line x1="8" x2="8" y1="9" y2="13" /> <line x1="15" x2="15.01" y1="12" y2="12" /> <line x1="18" x2="18.01" y1="10" y2="10" /> <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /> </svg>`],
   ["games", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <line x1="6" x2="10" y1="11" y2="11" /> <line x1="8" x2="8" y1="9" y2="13" /> <line x1="15" x2="15.01" y1="12" y2="12" /> <line x1="18" x2="18.01" y1="10" y2="10" /> <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /> </svg>`],
   ["streaming", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <line x1="6" x2="10" y1="11" y2="11" /> <line x1="8" x2="8" y1="9" y2="13" /> <line x1="15" x2="15.01" y1="12" y2="12" /> <line x1="18" x2="18.01" y1="10" y2="10" /> <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" /> </svg>`],
+  ["ben", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
+  ["bento", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
+  ["streaming", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect x="2" y="3" rx="2" /> <line x1="8" x2="16" y1="21" y2="21" /> <line x1="12" x2="12" y1="17" y2="21" /> </svg>`],
+  ["assinatura", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect x="2" y="3" rx="2" /> <line x1="8" x2="16" y1="21" y2="21" /> <line x1="12" x2="12" y1="17" y2="21" /> </svg>`],
+  ["netflix", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect x="2" y="3" rx="2" /> <line x1="8" x2="16" y1="21" y2="21" /> <line x1="12" x2="12" y1="17" y2="21" /> </svg>`],
+  ["outros", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /> </svg>`],
+  ["other", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /> </svg>`],
   ["bebe", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
   ["criança", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
   ["filhos", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /> </svg>`],
@@ -1040,7 +1047,7 @@ function renderDashboard() {
   // Gastos manuais lançados (reais)
   spendingSummary.forEach(s => {
     if (!spendByCat[s.category_name])
-      spendByCat[s.category_name] = { spent: 0, catId: s.category_id, emoji: s.category_emoji };
+      spendByCat[s.category_name] = { spent: 0, catId: s.category_id, cat: categories.find(c => c.id === s.category_id) };
     spendByCat[s.category_name].spent += Number(s.total_spent);
   });
   // Automáticos (recurrence_type='automatico', due_day=null): cobranças que ocorrem todo mês
@@ -1049,7 +1056,7 @@ function renderDashboard() {
     const cat = categories.find(x => x.id === c.category_id);
     if (!cat) return;
     const key = cat.name;
-    if (!spendByCat[key]) spendByCat[key] = { spent: 0, catId: cat.id, emoji: cat.emoji || '' };
+    if (!spendByCat[key]) spendByCat[key] = { spent: 0, catId: cat.id, cat: cat };
     spendByCat[key].spent += Number(c.planned_amount);
   });
 
@@ -1078,7 +1085,7 @@ function renderDashboard() {
   const topHtml = sorted.map(([name, d], i) => `
     <div class="top-row" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(d.catId)}','${esc(name)}')">
       <div class="top-rank">${i+1}</div>
-      <div class="top-name">${esc(d.emoji||'•')} ${esc(name)}</div>
+      <div class="top-name" style="display:flex;align-items:center;gap:6px">${catAvatar(d.cat,'sm')} ${esc(name)}</div>
       <div class="top-bar-wrap"><div class="top-bar" style="width:${Math.round(d.spent/maxSpent*100)}%"></div></div>
       <div class="top-val">R$${fmt(d.spent)}</div>
     </div>`).join('');
@@ -1104,7 +1111,7 @@ function renderDashboard() {
       <div class="sec-title">Acima do teto</div>
       ${overBudget.map(([n,d]) => {
         const lim = getLimitForCategory(d.catId);
-        return `<div class="alert-item"><span class="name">${esc(d.emoji||'•')} ${esc(n)}</span><span class="val">+R$ ${fmt(d.spent-lim)}</span></div>`;
+        return `<div class="alert-item"><span class="name" style="display:flex;align-items:center;gap:6px">${catAvatar(d.cat,'sm')} ${esc(n)}</span><span class="val">+R$ ${fmt(d.spent-lim)}</span></div>`;
       }).join('')}` : ''}
 
     <div class="sec-title">Resumo do mês</div>
@@ -1444,7 +1451,7 @@ function abrirEditarCommitment(id) {
   const c = commitments.find(x => x.id===id);
   if (!c) return;
   const catOpts    = categories.map(cat =>
-    `<option value="${esc(cat.id)}" ${cat.id===c.category_id?'selected':''}>${esc(cat.emoji||'')} ${esc(cat.name)}</option>`
+    `<option value="${esc(cat.id)}" ${cat.id===c.category_id?'selected':''}>${esc(cat.name)}</option>`
   ).join('');
   const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
   const cardOpts   = creditCards.map(p =>
@@ -1602,7 +1609,7 @@ async function limparDuplicados() {
 }
 
 function abrirModalNovaConta() {
-  const catOpts    = categories.map(c => `<option value="${esc(c.id)}">${esc(c.emoji||'')} ${esc(c.name)}</option>`).join('');
+  const catOpts    = categories.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
   const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
   const cardOpts   = creditCards.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   document.getElementById('modal-content').innerHTML = `
@@ -1869,7 +1876,7 @@ function renderFaturas() {
 // === GASTOS ===
 function renderGastos() {
   const el = document.getElementById('gastos-root');
-  const catOpts = categories.map(c => `<option value="${esc(c.id)}">${esc(c.emoji||'')} ${esc(c.name)}</option>`).join('');
+  const catOpts = categories.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
   const pmOpts  = paymentMethods.filter(p => p.active!==false).map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   const totalGasto = spendingEntries.reduce((s,e) => s+Number(e.amount), 0);
   const hoje = new Date().toISOString().slice(0,10);
@@ -2414,7 +2421,7 @@ function abrirTetoModal(catId) {
   const valorAtual = budget ? Number(budget.limit_amount).toFixed(2) : '';
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
-    <div class="modal-title">Teto de gasto — ${esc(cat?.emoji||'')} ${esc(cat?.name||'Categoria')}</div>
+    <div class="modal-title" style="display:flex;align-items:center;gap:8px">${catAvatar(cat,'sm')} Teto — ${esc(cat?.name||'Categoria')}</div>
     <input type="hidden" id="teto-cat-id" value="${esc(catId)}" />
     <div class="field">
       <label>Limite mensal (R$)</label>
@@ -2491,7 +2498,7 @@ function abrirCatDrilldown(catId, catName) {
 
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-handle"></div>
-    <div class="modal-title">${esc(cat?.emoji||'•')} ${esc(catName)}</div>
+    <div class="modal-title" style="display:flex;align-items:center;gap:8px">${catAvatar(cat,'sm')} ${esc(catName)}</div>
     <div style="text-align:center;padding:4px 0 14px">
       <div style="font-size:26px;font-weight:700;color:var(--text-1)">R$ ${fmt(totalCat)}</div>
       <div style="font-size:12px;color:var(--text-3);margin-top:2px">total no mês</div>
