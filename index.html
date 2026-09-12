@@ -61,8 +61,18 @@
       position: sticky; top: 0; z-index: 10;
       border-bottom: 1px solid var(--border);
     }
-    .app-title { font-size: 17px; font-weight: 700; color: var(--text-1); }
-    .app-title span { color: var(--accent); }
+    .app-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 17px; font-weight: 700; color: var(--text-1);
+      text-decoration: none;
+    }
+    .app-title-icon {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: var(--accent); display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .app-title-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .app-title-text em { font-style: normal; color: var(--accent); }
     .mes-nav { display: flex; align-items: center; gap: 2px; }
     .mes-nav-btn {
       background: none; border: none; color: var(--text-3); font-size: 22px;
@@ -590,7 +600,12 @@
 <div id="aviso-global"></div>
 
 <header class="app-header">
-  <div class="app-title">Orçamento <span>Ivan</span></div>
+  <div class="app-title">
+    <div class="app-title-icon">
+      <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+    </div>
+    <span class="app-title-text">Orçamento <em>Ivan</em></span>
+  </div>
   <div class="mes-nav">
     <button class="mes-nav-btn" onclick="navMes(-1)">‹</button>
     <span class="mes-nav-label" id="mes-label">Carregando...</span>
@@ -830,7 +845,7 @@ async function propagarRecorrentes() {
 
 async function loadMes(propagate = true) {
   document.getElementById('mes-label').textContent = mesLabel(mesAtual, anoAtual);
-  dirtyTabs = new Set(['dashboard','planejamento','pagar','gastos','faturas']);
+  dirtyTabs = new Set(['dashboard','planejamento','pagar','gastos','faturas','perfil']);
 
   const prevM = mesAtual === 1 ? 12 : mesAtual - 1;
   const prevA = mesAtual === 1 ? anoAtual - 1 : anoAtual;
