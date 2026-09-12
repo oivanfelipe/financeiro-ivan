@@ -1053,7 +1053,7 @@ function renderDashboard() {
   const realClass = sobraReal >= 0 ? 'green' : 'red';
 
   const spendByCat = {};
-  // Apenas gastos reais lançados — "acima do teto" só dispara quando há gastos registrados
+  // Gastos manuais registrados na aba Gastos
   spendingEntries.forEach(e => {
     const cat = categories.find(c => c.id === e.category_id);
     const key = cat ? cat.name : 'Sem categoria';
@@ -1061,7 +1061,15 @@ function renderDashboard() {
     if (!spendByCat[key]) spendByCat[key] = { spent: 0, catId: e.category_id, cat: catRef };
     spendByCat[key].spent += Number(e.amount);
   });
-  // Planejamento (commitments) afeta sobraProjetada — não conta como gasto real aqui
+  // Automáticos (Netflix, Spotify etc.) contam como gasto real — acontecem todo mês sem ação manual
+  // Manual e Pontual só entram na projeção (sobraProjetada), não como gasto real
+  commitments.filter(c => c.recurrence_type === 'automatico').forEach(c => {
+    const cat = categories.find(x => x.id === c.category_id);
+    if (!cat) return;
+    const key = cat.name;
+    if (!spendByCat[key]) spendByCat[key] = { spent: 0, catId: cat.id, cat: cat };
+    spendByCat[key].spent += Number(c.planned_amount);
+  });
 
   const catsWithBudget = categories.filter(c => getLimitForCategory(c.id) !== null);
   const paceHtml = catsWithBudget.map(cat => {
