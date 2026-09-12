@@ -489,10 +489,10 @@
       display: flex; justify-content: space-between; align-items: center;
     }
     .card-item {
-      display: flex; align-items: center; padding: 14px;
+      display: flex; align-items: center; gap: 12px; padding: 14px;
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px;
     }
-    .card-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-right: 12px; }
+    .card-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
     .card-info { flex: 1; min-width: 0; }
     .card-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
     .card-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
@@ -828,8 +828,16 @@ function catIconSvg(cat) {
   return null;
 }
 
+const CAT_COLOR_NAME = {
+  'melina': '#EC4899',
+  'mel':    '#EC4899',
+};
+function catAvatarBg(cat) {
+  const key = (cat?.name || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return CAT_COLOR_NAME[key] || catColor(cat?.id || cat?.name || '?');
+}
 function catAvatar(cat, size='') {
-  const bg  = catColor(cat?.id || cat?.name || '?');
+  const bg  = catAvatarBg(cat);
   const cls = size === 'sm' ? 'cat-avatar sm' : 'cat-avatar';
   const svg = catIconSvg(cat);
   if (svg) return `<div class="${cls} has-svg" style="background:${bg}">${svg}</div>`;
