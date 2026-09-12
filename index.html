@@ -6,6 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Orçamento Ivan</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237C3AED'/%3E%3Cpolyline points='26,9 17,17.5 12,12.5 6,19' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpolyline points='20,9 26,9 26,15' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
@@ -319,11 +320,16 @@
     .cat-avatar {
       width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 18px; font-weight: 700; color: #fff;
+      font-size: 18px; font-weight: 700; color: #fff; line-height: 1;
+      overflow: hidden;
     }
     .cat-avatar.sm { width: 28px; height: 28px; border-radius: 8px; font-size: 14px; }
-    .cat-avatar.has-svg svg { width: 58%; height: 58%; stroke: #fff; fill: none; display: block; }
-    .cat-avatar.sm.has-svg svg { width: 60%; height: 60%; }
+    .cat-avatar.has-svg svg {
+      width: 56%; height: 56%; display: block; flex-shrink: 0;
+      stroke: #fff; stroke-width: 2; fill: none;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    .cat-avatar.sm.has-svg svg { width: 58%; height: 58%; }
     .plan-emoji { font-size: 20px; flex-shrink: 0; }
     .plan-info  { flex: 1; min-width: 0; }
     .plan-name  { font-size: 14px; font-weight: 600; color: var(--text-1); }
@@ -716,6 +722,12 @@ function catColor(idOrName) {
   return CAT_PALETTE[h % CAT_PALETTE.length];
 }
 const CAT_ICON_MAP = [
+  ["melina", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15v7" /> <path d="M9 19h6" /> <circle cx="12" cy="9" r="6" /> </svg>`],
+  ["bem", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 3h5v5" /> <path d="m21 3-6.75 6.75" /> <circle cx="10" cy="14" r="6" /> </svg>`],
+  ["menina", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15v7" /> <path d="M9 19h6" /> <circle cx="12" cy="9" r="6" /> </svg>`],
+  ["menino", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 3h5v5" /> <path d="m21 3-6.75 6.75" /> <circle cx="10" cy="14" r="6" /> </svg>`],
+  ["filha", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 15v7" /> <path d="M9 19h6" /> <circle cx="12" cy="9" r="6" /> </svg>`],
+  ["filho", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 3h5v5" /> <path d="m21 3-6.75 6.75" /> <circle cx="10" cy="14" r="6" /> </svg>`],
   ["casa", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg>`],
   ["moradia", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg>`],
   ["aluguel", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg>`],
