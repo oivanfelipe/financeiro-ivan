@@ -1045,14 +1045,25 @@ function renderDashboard() {
   const totalPago         = commitments.reduce((s,c) => s + Number(c.paid || 0), 0);
   const totalGasto        = spendingEntries.reduce((s,e) => s + Number(e.amount), 0);
 
-  // Gastos fora do planejamento: lançados em categorias sem nenhum commitment no mês
+  // Sobra Projetada: por categoria usa max(planejado, gasto real)
+  // — captura excedentes E gastos fora do plano sem double-count
   const catIdsComCommitment = new Set(commitments.map(c => c.category_id));
+
+  // Cats COM commitment: max(planejado, gasto real) — excedente reduz projeção
+  const totalProjetadoComPlano = [...catIdsComCommitment].reduce((sum, catId) => {
+    const planned = commitments.filter(c => c.category_id === catId)
+      .reduce((s, c) => s + Number(c.planned_amount), 0);
+    const spent = spendingEntries.filter(e => e.category_id === catId)
+      .reduce((s, e) => s + Number(e.amount), 0);
+    return sum + Math.max(planned, spent);
+  }, 0);
+
+  // Cats SEM commitment: gasto real (fora do plano)
   const totalGastoForaPlano = spendingEntries
     .filter(e => !catIdsComCommitment.has(e.category_id))
     .reduce((s, e) => s + Number(e.amount), 0);
 
-  // Sobra Projetada: planejado + gastos extras fora do plano
-  const sobraProjetada = totalEntradas - totalComprometido - totalGastoForaPlano;
+  const sobraProjetada = totalEntradas - totalProjetadoComPlano - totalGastoForaPlano;
   // Sobra Real: entradas - todos os gastos lançados
   const sobraReal      = totalEntradas - totalGasto;
   const totalPrevEntradas = prevIncomeEntries.reduce((s,e) => s + Number(e.amount), 0);
