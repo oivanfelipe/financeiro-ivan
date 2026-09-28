@@ -894,6 +894,14 @@ function avisar(html, tipo) {
 
 function mesLabel(m, y) { return `${MESES[m-1]} ${y}`; }
 
+// Soma n meses a um mês/ano — usado por repetição, parcelamento e propagação de recorrentes.
+// Antes existiam 3 cópias idênticas desta função espalhadas pelo código
+// (ver docs/vibecode-blueprint/06-implementation-plan.md, item 9).
+function addMeses(m, a, n) {
+  const total = (a * 12 + m - 1) + n;
+  return { month: (total % 12) + 1, year: Math.floor(total / 12) };
+}
+
 function statusConta(item, venc) {
   const pct = item.planned_amount > 0 ? (item.paid / item.planned_amount) : 0;
   if (pct >= 0.9995) return 'pago';
@@ -913,14 +921,27 @@ function statusConta(item, venc) {
   return 'futuro';
 }
 
+// statusConta devolve 'parcial' para QUALQUER pagamento parcial, mesmo já vencido
+// (ver docs/vibecode-blueprint/06-implementation-plan.md, item 2) — por isso a prioridade
+// checa a data de vencimento por conta própria, sem depender do status textual.
+function contaVencida(venc) {
+  if (!venc) return false;
+  const agora = new Date();
+  const mesHoje = agora.getMonth() + 1;
+  const anoHoje = agora.getFullYear();
+  if (anoAtual < anoHoje || (anoAtual === anoHoje && mesAtual < mesHoje)) return true;
+  if (anoAtual > anoHoje || (anoAtual === anoHoje && mesAtual > mesHoje)) return false;
+  return venc < agora.getDate();
+}
+
 function prioridadeConta(item) {
   const s = statusConta(item, item.due_day);
-  if (s === 'vencido') return item.paid > 0 ? 1 : 0;
+  if (s === 'pago') return 6;
+  if (contaVencida(item.due_day)) return item.paid > 0 ? 1 : 0;
   if (s === 'hoje')    return 2;
   if (s === 'semana')  return 3;
   if (s === 'fatura' || s === 'futuro') return 4;
   if (s === 'parcial') return 5;
-  if (s === 'pago')    return 6;
   return 7;
 }
 
@@ -932,6 +953,14 @@ function getLimitForCategory(catId) {
 }
 
 // === SUPABASE ===
+// Mensagem de erro diferenciada: falha de rede vs. erro retornado pelo Supabase
+// (ver docs/vibecode-blueprint/06-implementation-plan.md, item 8).
+function mensagemErroCarregamento(e) {
+  const semRede = (e instanceof TypeError) || /failed to fetch|networkerror/i.test(e?.message || '');
+  if (semRede) return 'Sem conexão com a internet. Verifique a rede e tente novamente.';
+  return `Erro ao carregar dados do banco: ${e?.message || 'erro desconhecido'}.`;
+}
+
 async function loadAll() {
   document.getElementById('btn-refresh').disabled = true;
   try {
@@ -940,12 +969,14 @@ async function loadAll() {
       sb.from('fin_payment_methods').select('*').order('sort_order'),
       sb.from('fin_category_budgets').select('*')
     ]);
+    const erro = cats.error || pms.error || budgets.error;
+    if (erro) throw erro;
     categories      = cats.data    || [];
     paymentMethods  = pms.data     || [];
     categoryBudgets = budgets.data || [];
     await loadMes();
   } catch(e) {
-    avisar('Erro ao conectar ao banco de dados.', '');
+    avisar(mensagemErroCarregamento(e), '');
   } finally {
     document.getElementById('btn-refresh').disabled = false;
   }
@@ -982,6 +1013,11 @@ async function loadMes(propagate = true) {
     sb.from('fin_income_entries').select('*').eq('month', mesAtual).eq('year', anoAtual).order('entry_date'),
     sb.from('fin_income_entries').select('*').eq('month', prevM).eq('year', prevA).order('entry_date')
   ]);
+
+  // Antes, um erro aqui (permissão, tabela ausente) era ignorado em silêncio e o mês
+  // aparecia vazio sem aviso nenhum (ver docs/vibecode-blueprint/06-implementation-plan.md, item 8).
+  const erroMes = cmts.error || spend.error || spSum.error || inc.error || incPrev.error;
+  if (erroMes) { avisar(mensagemErroCarregamento(erroMes), ''); return; }
 
   commitments      = cmts.data    || [];
   spendingEntries  = spend.data   || [];
@@ -1037,16 +1073,11 @@ async function insertPayment(commitmentId, amount, methodId, note, date) {
   return data;
 }
 
-// === DASHBOARD ===
-function renderDashboard() {
-  const el = document.getElementById('dash-root');
-  const totalEntradas     = incomeEntries.reduce((s,e) => s + Number(e.amount), 0);
-  const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
-  const totalPago         = commitments.reduce((s,c) => s + Number(c.paid || 0), 0);
-  const totalGasto        = spendingEntries.reduce((s,e) => s + Number(e.amount), 0);
-
-  // Sobra Projetada: por categoria usa max(planejado, gasto real)
-  // — captura excedentes E gastos fora do plano sem double-count
+// Sobra Projetada: entradas − (por categoria, o maior entre planejado e gasto real) − gastos fora do plano.
+// Fórmula oficial de "quanto sobra" do app — usada no Dashboard e no Planejamento, para não haver
+// dois números diferentes com o mesmo nome (ver docs/vibecode-blueprint/06-implementation-plan.md, item 1).
+function calcSobraProjetada() {
+  const totalEntradas = incomeEntries.reduce((s,e) => s + Number(e.amount), 0);
   const catIdsComCommitment = new Set(commitments.map(c => c.category_id));
 
   // Cats COM commitment: max(planejado, gasto real) — excedente reduz projeção
@@ -1064,7 +1095,18 @@ function renderDashboard() {
     .reduce((s, e) => s + Number(e.amount), 0);
 
   const sobraProjetada = totalEntradas - totalProjetadoComPlano - totalGastoForaPlano;
-  // Sobra Real: entradas - todos os gastos lançados
+  return { totalEntradas, sobraProjetada };
+}
+
+// === DASHBOARD ===
+function renderDashboard() {
+  const el = document.getElementById('dash-root');
+  const { totalEntradas, sobraProjetada } = calcSobraProjetada();
+  const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
+  const totalPago         = commitments.reduce((s,c) => s + Number(c.paid || 0), 0);
+  const totalGasto        = spendingEntries.reduce((s,e) => s + Number(e.amount), 0);
+
+  // Sobra Real: entradas - gastos já lançados (não considera contas que ainda vão vencer este mês)
   const sobraReal      = totalEntradas - totalGasto;
   const totalPrevEntradas = prevIncomeEntries.reduce((s,e) => s + Number(e.amount), 0);
   const projClass = sobraProjetada >= 0 ? 'green' : 'red';
@@ -1140,12 +1182,12 @@ function renderDashboard() {
 
   el.innerHTML = `
     <div class="hero">
-      <div class="hero-eyebrow">Sobra Real</div>
-      <div class="hero-number ${realClass}">R$ ${fmt(sobraReal)}</div>
-      <div class="hero-sub">Entradas − gastos lançados</div>
+      <div class="hero-eyebrow">Sobra Projetada</div>
+      <div class="hero-number ${projClass}">R$ ${fmt(sobraProjetada)}</div>
+      <div class="hero-sub">Entradas − comprometido do mês (considera contas que ainda faltam vencer)</div>
       <div class="hero-chips">
         <span class="hero-chip">Entradas R$ ${fmt(totalEntradas)}</span>
-        <span class="hero-chip ${projClass}">Projetada R$ ${fmt(sobraProjetada)}</span>
+        <span class="hero-chip ${realClass}">Sobra real R$ ${fmt(sobraReal)}</span>
       </div>
     </div>
     <div class="hero-divider"></div>
@@ -1217,8 +1259,7 @@ function renderPlanejamento() {
 
   const proxM = mesAtual === 12 ? 1 : mesAtual + 1;
   const proxA = mesAtual === 12 ? anoAtual + 1 : anoAtual;
-  const totalEntradas = incomeEntries.reduce((s, e) => s + Number(e.amount), 0);
-  const sobra = totalEntradas - totalComprometido;
+  const { totalEntradas, sobraProjetada: sobra } = calcSobraProjetada();
   const sobraClass = sobra >= 0 ? 'green' : 'red';
 
   const incomeHtml = incomeEntries.map(e => `
@@ -1238,7 +1279,7 @@ function renderPlanejamento() {
       <div class="hero-sub">${commitments.length} contas planejadas</div>
       <div class="hero-chips">
         <span class="hero-chip green">Entradas R$ ${fmt(totalEntradas)}</span>
-        <span class="hero-chip ${sobraClass}">Sobra R$ ${fmt(sobra)}</span>
+        <span class="hero-chip ${sobraClass}">Sobra projetada R$ ${fmt(sobra)}</span>
       </div>
     </div>
     <div class="hero-divider"></div>
@@ -1337,7 +1378,7 @@ function buildContaCard(c) {
       <div class="conta-top">
         <div class="conta-left">
           <div class="conta-name">${esc(c.name)}</div>
-          <div class="conta-meta">${c.category_name ? esc(c.category_name) : ''}${c.due_day?' · Dia '+c.due_day:''}${c.type==='parcelado'&&c.installment_current?` · ${c.installment_current}/${c.installment_total}`:''}</div>
+          <div class="conta-meta">${c.category_name ? esc(c.category_name) : ''}${c.due_day?' · Dia '+c.due_day:''}</div>
           ${badgeMap[status]||''}${defPmBadge}
         </div>
         <div class="conta-right">
@@ -1590,23 +1631,29 @@ async function salvarEdicao() {
   const nParcelas      = Math.max(1, parseInt(document.getElementById('edit-parcelas')?.value) || 6);
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
 
-  function addMeses(m, a, n) {
-    const total = (a * 12 + m - 1) + n;
-    return { month: (total % 12) + 1, year: Math.floor(total / 12) };
-  }
+  // "Parcelar" divide o valor total pelo número de parcelas (resto absorvido pela última),
+  // igual ao parcelamento da aba Gastos — antes cada parcela repetia o valor cheio
+  // (ver docs/vibecode-blueprint/06-implementation-plan.md, item 3).
+  const totalParcelas = nParcelas + 1;
+  const vpParcela      = Math.round((valor / totalParcelas) * 100) / 100;
+  const restoParcela   = Math.round((valor - vpParcela * (totalParcelas - 1)) * 100) / 100;
 
   const btn = document.querySelector('#modal-content .btn-save');
   if (btn) btn.disabled = true;
   try {
-    const { error } = await sb.from('fin_commitments').update({ name: nome, category_id: catId, planned_amount: valor, due_day: dia, type: tipo, recurrence_type: recurrenceType, default_payment_method_id: defPmId }).eq('id', id);
+    const isParcelando = repMode === 'parcelar' && nParcelas >= 1;
+    const nomeEditado  = isParcelando ? `${nome} (1/${totalParcelas})` : nome;
+    const valorEditado = isParcelando ? vpParcela : valor;
+    const { error } = await sb.from('fin_commitments').update({ name: nomeEditado, category_id: catId, planned_amount: valorEditado, due_day: dia, type: tipo, recurrence_type: recurrenceType, default_payment_method_id: defPmId }).eq('id', id);
     if (error) throw error;
 
-    if (repMode === 'parcelar' && nParcelas >= 1) {
+    if (isParcelando) {
       for (let i = 1; i <= nParcelas; i++) {
         const { month, year } = addMeses(mesAtual, anoAtual, i);
-        await insertCommitment({ month, year, name: `${nome} (${i+1}/${nParcelas+1})`, category_id: catId, type: 'pontual', planned_amount: valor, due_day: dia, default_payment_method_id: defPmId, recurrence_type: 'pontual' });
+        const valorParcela = (i === nParcelas) ? restoParcela : vpParcela;
+        await insertCommitment({ month, year, name: `${nome} (${i+1}/${totalParcelas})`, category_id: catId, type: 'pontual', planned_amount: valorParcela, due_day: dia, default_payment_method_id: defPmId, recurrence_type: 'pontual' });
       }
-      fecharModal(); await loadMes(); showToast(`Atualizado + ${nParcelas} parcelas criadas ✓`, 'success');
+      fecharModal(); await loadMes(); showToast(`Atualizado + ${nParcelas} parcelas de R$ ${fmt(vpParcela)} criadas ✓`, 'success');
     } else if (repMode === 'repetir' && nMeses >= 1) {
       for (let i = 1; i <= nMeses; i++) {
         const { month, year } = addMeses(mesAtual, anoAtual, i);
@@ -1782,10 +1829,10 @@ async function salvarNovaConta() {
   const tipo = recurrenceType === 'pontual' ? 'pontual' : 'fixo';
   if (!nome || !valor || valor<=0) { showToast('Preencha nome e valor','error'); return; }
 
-  function addMeses(m, a, n) {
-    const total = (a * 12 + m - 1) + n;
-    return { month: (total % 12) + 1, year: Math.floor(total / 12) };
-  }
+  // "Parcelar" divide o valor total pelo número de parcelas (resto absorvido pela última),
+  // igual ao parcelamento da aba Gastos (ver docs/vibecode-blueprint/06-implementation-plan.md, item 3).
+  const vpParcela    = Math.round((valor / nParcelas) * 100) / 100;
+  const restoParcela = Math.round((valor - vpParcela * (nParcelas - 1)) * 100) / 100;
 
   const btn = document.querySelector('#modal-content .btn-save');
   if (btn) btn.disabled = true;
@@ -1793,9 +1840,10 @@ async function salvarNovaConta() {
     if (repMode === 'parcelar' && nParcelas >= 2) {
       for (let i = 0; i < nParcelas; i++) {
         const { month, year } = addMeses(mesAtual, anoAtual, i);
-        await insertCommitment({ month, year, name: `${nome} (${i+1}/${nParcelas})`, category_id: catId, type: 'pontual', planned_amount: valor, due_day: dia, default_payment_method_id: defPmId, recurrence_type: 'pontual' });
+        const valorParcela = (i === nParcelas - 1) ? restoParcela : vpParcela;
+        await insertCommitment({ month, year, name: `${nome} (${i+1}/${nParcelas})`, category_id: catId, type: 'pontual', planned_amount: valorParcela, due_day: dia, default_payment_method_id: defPmId, recurrence_type: 'pontual' });
       }
-      fecharModal(); await loadMes(); showToast(`${nParcelas} parcelas criadas ✓`, 'success');
+      fecharModal(); await loadMes(); showToast(`${nParcelas} parcelas de R$ ${fmt(vpParcela)} criadas ✓`, 'success');
     } else if (repMode === 'repetir' && nMeses >= 2) {
       for (let i = 0; i < nMeses; i++) {
         const { month, year } = addMeses(mesAtual, anoAtual, i);
@@ -2080,13 +2128,9 @@ async function addParcelado() {
   const nome = subcat || categories.find(c => c.id === catId)?.name || 'Compra';
   const vp   = Math.round((valor / n) * 100) / 100;
   const resto = Math.round((valor - vp * (n - 1)) * 100) / 100;
-  function addMesesLocal(m, a, i) {
-    const total = (a * 12 + m - 1) + i;
-    return { month: (total % 12) + 1, year: Math.floor(total / 12) };
-  }
   const entries = [];
   for (let i = 0; i < n; i++) {
-    const { month, year } = addMesesLocal(mesAtual, anoAtual, i);
+    const { month, year } = addMeses(mesAtual, anoAtual, i);
     entries.push({ month, year, name: `${nome} (${i+1}/${n})`, planned_amount: i === n-1 ? resto : vp, recurrence_type: 'pontual', default_payment_method_id: pmId, category_id: catId, due_day: null, type: 'pontual' });
   }
   const { error } = await sb.from('fin_commitments').insert(entries);
@@ -2381,8 +2425,12 @@ async function salvarCategoria() {
 
 async function deletarCategoria(id, nome) {
   if (!confirm(`Excluir categoria "${nome}"?`)) return;
-  const { count } = await sb.from('fin_commitments').select('id', { count: 'exact', head: true }).eq('category_id', id);
-  if (count > 0) { showToast('Categoria em uso, remova as despesas primeiro','error'); return; }
+  const [{ count: countCommitments }, { count: countSpending }, { count: countBudgets }] = await Promise.all([
+    sb.from('fin_commitments').select('id', { count: 'exact', head: true }).eq('category_id', id),
+    sb.from('fin_spending_entries').select('id', { count: 'exact', head: true }).eq('category_id', id),
+    sb.from('fin_category_budgets').select('id', { count: 'exact', head: true }).eq('category_id', id)
+  ]);
+  if (countCommitments > 0 || countSpending > 0 || countBudgets > 0) { showToast('Categoria em uso, remova despesas, gastos e tetos primeiro','error'); return; }
   const { error } = await sb.from('fin_categories').delete().eq('id', id);
   if (error) { showToast('Erro: '+error.message,'error'); return; }
   categories = categories.filter(c => c.id !== id);
