@@ -35,7 +35,7 @@ Fluxo típico de uso ao longo de um mês:
 ## Estados especiais
 
 - **Carregando:** cada aba mostra um spinner com o texto "Carregando..." em seu próprio espaço (`#dash-root`, `#planejamento-root`, `#pagar-root`), na primeira renderização.
-- **Erro de conexão:** toast vermelho fixo no rodapé com a mensagem genérica "Erro ao conectar ao banco de dados." — **pendência visível:** o app não diferencia "sem internet", "tabela/coluna inexistente" ou "erro de permissão"; qualquer falha de carregamento mostra o mesmo texto.
+- **Erro de conexão:** toast vermelho fixo no rodapé. **Resolvido:** antes a mensagem era sempre o texto genérico "Erro ao conectar ao banco de dados.", e um erro retornado pelo Supabase (permissão, tabela ausente) nem chegava a esse texto — era ignorado em silêncio e o mês só aparecia vazio. Agora `loadAll`/`loadMes` checam o erro de cada consulta e mostram uma mensagem que diferencia "sem conexão com a internet" de um erro real do banco, com a mensagem original do Supabase incluída (ver item 8 do Plano de Implementação).
 - **Lista vazia:** estado vazio (`.empty-state`, ícone + texto curto) quando não há contas, gastos ou entradas lançadas no mês.
 - **Categoria sem teto definido:** aparece separada, sem barra de progresso, em vez de ser omitida.
 - **Cartão sem consumo no mês:** o cartão inteiro é ocultado da aba Faturas (não aparece com total zero).

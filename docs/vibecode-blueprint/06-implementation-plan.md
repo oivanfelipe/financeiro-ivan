@@ -11,17 +11,17 @@
 
 ## Backlog recomendado (ordem sugerida)
 
-Ordenado do que mais afeta confiança nos números/segurança para o que é só limpeza:
+Ordenado do que mais afeta confiança nos números/segurança para o que é só limpeza. Itens 1, 2, 3, 4, 5, 8 e 9 já foram corrigidos em `index.html` (commit "Fix six inconsistencies found in the vibecode-blueprint review"); 6 e 7 seguem em aberto porque dependem de uma decisão fora do código (configuração do Supabase e destino de uma funcionalidade).
 
-1. **Unificar ou renomear os três cálculos de "sobra"** (Dashboard: Sobra Real e Sobra Projetada; Planejamento: Sobra) — hoje têm nomes parecidos e fórmulas diferentes, o maior risco de o usuário confiar no número errado. Fazer isso primeiro porque qualquer mudança de regra de negócio depois vai mexer nessas mesmas contas.
-2. **Corrigir a priorização de contas vencidas com pagamento parcial** (`prioridadeConta`) — hoje uma conta vencida e parcialmente paga não sobe para o topo da lista de "A Pagar" como provavelmente deveria, por causa de uma ordem de verificação que torna esse caso inalcançável.
-3. **Decidir um único comportamento de "parcelar"** — hoje existem dois (um que divide o valor por N, outro que repete o valor cheio em cada parcela), dependendo de onde o parcelamento é criado (Gastos vs. Planejamento). Escolher um e migrar o outro caminho para usá-lo.
-4. **Resolver o campo morto `type: 'parcelado'`** — ou implementar de verdade (gravando `installment_current`/`installment_total`) ou remover a leitura desse caso do card de conta, já que hoje nunca é escrito.
-5. **Completar a checagem de exclusão de categoria** — verificar também `fin_spending_entries` e `fin_category_budgets`, não só `fin_commitments`, antes de permitir apagar uma categoria.
-6. **Mover a chave do Supabase para fora do HTML versionado publicamente** (variável de ambiente + build step mínimo, ou ao menos confirmar que a Row Level Security no Supabase está configurada para tornar essa exposição segura).
-7. **Decidir o destino do formulário "Dados pessoais" do Perfil** — hoje salva no `localStorage` e nunca é lido de volta; ou remover, ou dar um uso real a ele (ex.: usar o "dia de recebimento" para ajustar a defasagem de entradas mencionada no modal de receita).
-8. **Diferenciar mensagens de erro de carregamento** (rede vs. permissão vs. tabela ausente) em vez do texto genérico único.
-9. **Extrair a função `addMeses` duplicada 3 vezes** para um único lugar, evitando divergência futura entre as cópias.
+1. ✅ **Unificar os três cálculos de "sobra".** Sobra Projetada (entradas − max(planejado, gasto real) por categoria − gastos fora do plano) passou a ser a única fórmula, usada como número principal do Dashboard e reaproveitada no Planejamento; Sobra Real virou um chip secundário no Dashboard.
+2. ✅ **Corrigir a priorização de contas vencidas com pagamento parcial** (`prioridadeConta`) — agora checa a data de vencimento de forma independente do texto de status, então uma conta vencida e parcialmente paga sobe para perto do topo de "A Pagar".
+3. ✅ **Unificar o comportamento de "parcelar"** — as duas telas de Planejamento (nova conta e editar conta) agora dividem o valor total pelo número de parcelas (resto na última), igual à aba Gastos, em vez de repetir o valor cheio em cada parcela.
+4. ✅ **Remover o campo morto `type: 'parcelado'`** — a leitura de `installment_current`/`installment_total` no card de conta foi removida; a informação de parcela já aparece no nome ("Nome (2/6)").
+5. ✅ **Completar a checagem de exclusão de categoria** — agora verifica `fin_spending_entries` e `fin_category_budgets`, além de `fin_commitments`, antes de permitir apagar.
+6. ⏳ **Mover a chave do Supabase para fora do HTML versionado publicamente** (variável de ambiente + build step mínimo), ou ao menos confirmar que a Row Level Security no Supabase está configurada para tornar essa exposição seguro. Não corrigido nesta rodada — depende de acesso ao painel do Supabase para confirmar a configuração de RLS antes de decidir a abordagem.
+7. ⏳ **Decidir o destino do formulário "Dados pessoais" do Perfil** — hoje salva no `localStorage` e nunca é lido de volta; ou remover, ou dar um uso real a ele (ex.: usar o "dia de recebimento" para ajustar a defasagem de entradas mencionada no modal de receita). Não corrigido nesta rodada — é uma decisão de produto (manter, remover ou completar), não uma correção técnica direta.
+8. ✅ **Diferenciar mensagens de erro de carregamento.** `loadAll` e `loadMes` agora checam o campo `error` de cada consulta (antes um erro de permissão ou tabela ausente era ignorado em silêncio, mostrando o mês como vazio sem aviso nenhum) e mostram uma mensagem que distingue "sem rede" de um erro real do Supabase.
+9. ✅ **Extrair a função `addMeses` duplicada 3 vezes** para um único lugar, no topo do arquivo, reutilizada por todos os fluxos de repetição/parcelamento/propagação.
 
 ## Marcos de validação
 

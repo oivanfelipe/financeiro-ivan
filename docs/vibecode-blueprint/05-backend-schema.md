@@ -49,7 +49,7 @@
 | default_payment_method_id | FK → fin_payment_methods.id, nullable | Cartão/método padrão de cobrança |
 | recurrence_type | enum text | `automatico` \| `manual` \| `pontual` (padrão `manual` quando nulo) |
 
-**Pendência visível:** a tela lê e exibe `installment_current`/`installment_total` para `type === 'parcelado'`, mas nenhuma rotina de escrita jamais grava `type: 'parcelado'` ou esses dois campos — parcelamentos reais são criados como N linhas separadas com `type: 'pontual'` e nome sufixado `"(i/N)"`. Esse trecho de leitura é código morto no comportamento atual.
+**Resolvido:** a tela lia e exibia `installment_current`/`installment_total` para `type === 'parcelado'`, mas nenhuma rotina de escrita jamais gravava `type: 'parcelado'` ou esses dois campos — parcelamentos reais são criados como N linhas separadas com `type: 'pontual'` e nome sufixado `"(i/N)"`. A leitura morta desse caso foi removida do card de conta; a informação de parcela já aparece no nome (ver item 4 do Plano de Implementação).
 
 ### `fin_commitment_summary` (view, somente leitura)
 Agrega `fin_commitments` + soma de pagamentos + nome da categoria. Campos usados: `id, name, category_id, category_name, planned_amount, due_day, paid, remaining, type`. O app complementa essa view com uma segunda consulta a `fin_commitments` para obter `default_payment_method_id` e `recurrence_type`, que a view não expõe.
@@ -78,7 +78,7 @@ Regra: pagar com um método do tipo `credito` também cria automaticamente uma l
 | spend_date | date | Data do gasto |
 | subcategory | text, nullable | Rótulo livre de subcategoria, usado também como sugestão de autocomplete |
 
-**Pendência visível:** a opção "Parcelado?" na tela de Gastos **não grava nesta tabela** — ela cria N linhas em `fin_commitments` (mesmo mecanismo do parcelamento do Planejamento, mas dividindo o valor pelo número de parcelas, diferente da lógica usada em Planejamento, que repete o valor cheio em cada parcela). São duas implementações de "parcelar" com resultados diferentes.
+**Parcialmente resolvido:** a opção "Parcelado?" na tela de Gastos **não grava nesta tabela** — ela cria N linhas em `fin_commitments` (mesmo mecanismo do parcelamento do Planejamento). Isso continua assim (é a arquitetura de dados, não muda). O que era uma pendência — o Planejamento repetir o valor cheio em cada parcela em vez de dividir — foi corrigido: as duas telas agora dividem o valor total pelo número de parcelas, com o resto absorvido pela última (ver item 3 do Plano de Implementação).
 
 ### `fin_spending_summary` (view, somente leitura)
 Agrega `fin_spending_entries` por cartão e categoria. Campos usados: `card_id, category_id, category_name, total_spent`. Usada exclusivamente pela aba Faturas.
@@ -112,7 +112,7 @@ fin_spending_entries ──(view agregada)── fin_spending_summary
 fin_income_entries (sem FK — tabela independente, só filtrada por month/year)
 ```
 
-**Pendência visível:** ao excluir uma categoria, o app só verifica se existem `fin_commitments` referenciando-a antes de bloquear a exclusão — não verifica `fin_spending_entries` nem `fin_category_budgets`. Excluir uma categoria que só tem gastos avulsos ou um teto cadastrado pode deixar registros órfãos (ou falhar de forma pouco clara, se houver uma constraint de chave estrangeira no banco).
+**Resolvido:** ao excluir uma categoria, o app só verificava se existiam `fin_commitments` referenciando-a antes de bloquear a exclusão — não verificava `fin_spending_entries` nem `fin_category_budgets`. Agora as três tabelas são checadas antes de permitir a exclusão (ver item 5 do Plano de Implementação).
 
 ## Regras de acesso aos dados
 
