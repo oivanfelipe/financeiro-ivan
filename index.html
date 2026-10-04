@@ -1851,10 +1851,12 @@ function renderFaturas() {
   const creditCards = paymentMethods.filter(p => p.type==='credito' && p.active!==false);
 
   const faturaHtml = creditCards.map(card => {
-    const cardEntries  = spendingSummary.filter(s => s.card_id===card.id);
+    const cardEntries    = spendingEntries
+      .filter(e => e.payment_method_id===card.id)
+      .sort((a,b)=>a.spend_date.localeCompare(b.spend_date));
     const autoItems      = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
     const parceladoItems = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null);
-    const manualTotal    = cardEntries.reduce((s,x) => s+Number(x.total_spent), 0);
+    const manualTotal    = cardEntries.reduce((s,e) => s+Number(e.amount), 0);
     const autoTotal      = autoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
     const parceladoTotal = parceladoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
     const total          = manualTotal + autoTotal + parceladoTotal;
@@ -1873,6 +1875,21 @@ function renderFaturas() {
         <span class="fatura-cat-name">${esc(c.name)}</span>
         <span class="fatura-cat-val">R$ ${fmt(c.planned_amount)}</span>
       </div>`).join('');
+    const entryRowsHtml = cardEntries.map(e => {
+      const cat     = categories.find(c => c.id===e.category_id);
+      const label   = e.subcategory || e.description || (cat?.name || '—');
+      const dateStr = e.spend_date ? e.spend_date.slice(8,10)+'/'+e.spend_date.slice(5,7) : '';
+      return `
+        <div class="fatura-cat-row">
+          <span class="fatura-cat-name" style="display:flex;align-items:center;gap:6px">
+            ${catAvatar(cat,'sm')}
+            <span>
+              <span style="font-size:11px;color:var(--text-3);margin-right:3px">${esc(dateStr)}</span>${esc(label)}
+            </span>
+          </span>
+          <span class="fatura-cat-val">R$ ${fmt(e.amount)}</span>
+        </div>`;
+    }).join('');
     return `
       <div class="fatura-card">
         <div class="fatura-header">
@@ -1885,12 +1902,7 @@ function renderFaturas() {
         <div class="fatura-sub">Consumo de ${mesLabel(mesAtual,anoAtual)} · ${vencLabel}</div>
         ${autoItems.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Automáticos</div>${autoRowsHtml}` : ''}
         ${parceladoItems.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Parceladas</div>${parceladoRowsHtml}` : ''}
-        ${cardEntries.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Gastos manuais por categoria</div>` : ''}
-        ${cardEntries.sort((a,b)=>Number(b.total_spent)-Number(a.total_spent)).map(s=>`
-          <div class="fatura-cat-row">
-            <span class="fatura-cat-name" style="display:flex;align-items:center;gap:6px">${catAvatar(categories.find(c=>c.id===s.category_id),'sm')} ${esc(s.category_name)}</span>
-            <span class="fatura-cat-val">R$ ${fmt(s.total_spent)}</span>
-          </div>`).join('')}
+        ${cardEntries.length ? `<div style="font-size:11px;color:var(--text-3);padding:4px 0 2px;font-weight:600">Lançamentos (${cardEntries.length})</div>${entryRowsHtml}` : ''}
         <div class="fatura-total-row">
           <span>Total da fatura</span>
           <span style="font-weight:700;color:var(--text-1)">R$ ${fmt(total)}</span>
@@ -1899,10 +1911,10 @@ function renderFaturas() {
   }).filter(Boolean).join('');
 
   const totalFaturas = creditCards.reduce((sum, card) => {
-    const cardEntries  = spendingSummary.filter(s => s.card_id===card.id);
-    const autoItems    = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
-    const parcelados   = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null);
-    return sum + cardEntries.reduce((s,x)=>s+Number(x.total_spent),0) + autoItems.reduce((s,c)=>s+Number(c.planned_amount),0) + parcelados.reduce((s,c)=>s+Number(c.planned_amount),0);
+    const cardEntries = spendingEntries.filter(e => e.payment_method_id===card.id);
+    const autoItems   = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
+    const parcelados  = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null);
+    return sum + cardEntries.reduce((s,e)=>s+Number(e.amount),0) + autoItems.reduce((s,c)=>s+Number(c.planned_amount),0) + parcelados.reduce((s,c)=>s+Number(c.planned_amount),0);
   }, 0);
 
   el.innerHTML = `
