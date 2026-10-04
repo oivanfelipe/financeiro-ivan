@@ -1959,6 +1959,7 @@ function renderGastos() {
             <div class="gasto-meta">${esc(cat?.name||'')}${e.subcategory&&e.description?' · '+esc(e.description):''}${pm?' · '+esc(pm.name):''}</div>
           </div>
           <div class="gasto-valor">R$${fmt(e.amount)}</div>
+          <button class="gasto-del" style="color:var(--text-3)" onclick="editarLancamentoFatura('${esc(e.id)}','${esc(e.subcategory||e.description||cat?.name||'Gasto')}',${Number(e.amount)})">${ICO_PENCIL}</button>
           <button class="gasto-del" onclick="deletarGasto('${esc(e.id)}')">${ICO_TRASH}</button>
         </div>`;
     }).join('');
