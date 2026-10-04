@@ -1476,8 +1476,8 @@ async function confirmarPagamento(id, concluir = true) {
       await sb.from('fin_commitments').update({ planned_amount: totalPago }).eq('id', id);
     }
     if (pmType === 'credito' && pmId) {
-      const hoje = new Date().toISOString().slice(0,10);
-      await insertSpending(c.category_id || null, pmId, val, c.name, hoje);
+      const dataNoMes = `${anoAtual}-${String(mesAtual).padStart(2,'0')}-01`;
+      await insertSpending(c.category_id || null, pmId, val, c.name, dataNoMes);
     }
     await loadMes();
     showToast(`R$ ${fmt(val)} ${concluir ? 'pago e concluído ✓' : 'registrado (parcial)'}`, 'success');
