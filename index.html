@@ -1887,7 +1887,10 @@ function renderFaturas() {
               <span style="font-size:11px;color:var(--text-3);margin-right:3px">${esc(dateStr)}</span>${esc(label)}
             </span>
           </span>
-          <span class="fatura-cat-val">R$ ${fmt(e.amount)}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="fatura-cat-val">R$ ${fmt(e.amount)}</span>
+            <button class="btn-card-act" style="display:flex;align-items:center;justify-content:center" onclick="editarLancamentoFatura('${esc(e.id)}','${esc(label)}',${Number(e.amount)})">${ICO_PENCIL}</button>
+          </div>
         </div>`;
     }).join('');
     return `
@@ -2334,6 +2337,34 @@ async function salvarAutomatico(id) {
   fecharModal();
   await loadMes();
   showToast('Valor atualizado ✓','success');
+}
+
+// === EDITAR LANÇAMENTO (FATURAS) ===
+function editarLancamentoFatura(id, label, valorAtual) {
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Corrigir lançamento</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">${esc(label)}</div>
+    <div class="field"><label>Valor real (R$)</label>
+      <input type="number" id="lancamento-valor" value="${valorAtual}" min="0" step="0.01" inputmode="decimal" />
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:4px">O valor será atualizado no lançamento e refletirá na fatura e nos totais.</div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarLancamentoFatura('${esc(id)}')">Salvar</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('lancamento-valor')?.focus(), 100);
+}
+
+async function salvarLancamentoFatura(id) {
+  const valor = parseFloat(document.getElementById('lancamento-valor')?.value);
+  if (!valor || valor <= 0) { showToast('Valor inválido','error'); return; }
+  const { error } = await sb.from('fin_spending_entries').update({ amount: valor }).eq('id', id);
+  if (error) { showToast('Erro ao atualizar','error'); return; }
+  fecharModal();
+  await loadMes();
+  showToast('Lançamento corrigido ✓','success');
 }
 
 // === CRUD CATEGORIAS ===
