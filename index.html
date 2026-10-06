@@ -951,21 +951,34 @@ async function loadAll() {
   }
 }
 
+let _propagando = false;
 async function propagarRecorrentes() {
-  const prevM = mesAtual === 1 ? 12 : mesAtual - 1;
-  const prevA = mesAtual === 1 ? anoAtual - 1 : anoAtual;
-  const { data: prevCmts } = await sb.from('fin_commitments')
-    .select('name, category_id, type, planned_amount, due_day, default_payment_method_id, recurrence_type')
-    .eq('month', prevM).eq('year', prevA)
-    .neq('recurrence_type', 'pontual')
-    .neq('type', 'fatura');
-  if (!prevCmts || prevCmts.length === 0) return 0;
-  const existingNames = new Set(commitments.map(c => c.name));
-  const toInsert = prevCmts.filter(c => !existingNames.has(c.name));
-  for (const c of toInsert) {
-    await insertCommitment({ month: mesAtual, year: anoAtual, name: c.name, category_id: c.category_id, type: c.type, planned_amount: c.planned_amount, due_day: c.due_day, default_payment_method_id: c.default_payment_method_id, recurrence_type: c.recurrence_type });
+  if (_propagando) return 0;
+  _propagando = true;
+  try {
+    const prevM = mesAtual === 1 ? 12 : mesAtual - 1;
+    const prevA = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+    const [{ data: prevCmts }, { data: existingCmts }] = await Promise.all([
+      sb.from('fin_commitments')
+        .select('name, category_id, type, planned_amount, due_day, default_payment_method_id, recurrence_type')
+        .eq('month', prevM).eq('year', prevA)
+        .neq('recurrence_type', 'pontual')
+        .neq('type', 'fatura'),
+      sb.from('fin_commitments')
+        .select('name')
+        .eq('month', mesAtual).eq('year', anoAtual)
+        .neq('recurrence_type', 'pontual')
+    ]);
+    if (!prevCmts || prevCmts.length === 0) return 0;
+    const existingNames = new Set((existingCmts || []).map(c => c.name));
+    const toInsert = prevCmts.filter(c => !existingNames.has(c.name));
+    for (const c of toInsert) {
+      await insertCommitment({ month: mesAtual, year: anoAtual, name: c.name, category_id: c.category_id, type: c.type, planned_amount: c.planned_amount, due_day: c.due_day, default_payment_method_id: c.default_payment_method_id, recurrence_type: c.recurrence_type });
+    }
+    return toInsert.length;
+  } finally {
+    _propagando = false;
   }
-  return toInsert.length;
 }
 
 async function loadMes(propagate = true) {
