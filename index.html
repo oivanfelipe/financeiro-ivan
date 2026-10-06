@@ -1873,7 +1873,10 @@ function renderFaturas() {
     const parceladoRowsHtml = parceladoItems.map(c => `
       <div class="fatura-cat-row">
         <span class="fatura-cat-name">${esc(c.name)}</span>
-        <span class="fatura-cat-val">R$ ${fmt(c.planned_amount)}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="fatura-cat-val">R$ ${fmt(c.planned_amount)}</span>
+          <button class="btn-card-act" style="display:flex;align-items:center;justify-content:center" onclick="abrirEditarCommitment('${esc(c.id)}')">${ICO_PENCIL}</button>
+        </div>
       </div>`).join('');
     const entryRowsHtml = cardEntries.map(e => {
       const cat     = categories.find(c => c.id===e.category_id);
@@ -2022,6 +2025,25 @@ function renderGastos() {
       <div class="gr-card"><div class="gr-label">Lançamentos</div><div class="gr-val">${spendingEntries.length}</div></div>
     </div>
     ${listaHtml || '<div class="empty-state">Nenhum gasto registrado neste mês</div>'}
+    ${(() => {
+      const pontuais = commitments.filter(c => c.recurrence_type === 'pontual');
+      if (!pontuais.length) return '';
+      const rows = pontuais.map(c => {
+        const cat = categories.find(x => x.id===c.category_id);
+        const pm  = paymentMethods.find(p => p.id===c.default_payment_method_id);
+        return `
+          <div class="gasto-item">
+            <div class="gasto-emoji">${catAvatar(cat,'sm')}</div>
+            <div class="gasto-info">
+              <div class="gasto-desc">${esc(c.name)}</div>
+              <div class="gasto-meta">${esc(cat?.name||'')}${pm?' · '+esc(pm.name):''}${c.due_day?' · Dia '+c.due_day:''} · <em>parcelado</em></div>
+            </div>
+            <div class="gasto-valor">R$${fmt(c.planned_amount)}</div>
+            <button class="gasto-del" style="color:var(--text-3)" onclick="abrirEditarCommitment('${esc(c.id)}')">${ICO_PENCIL}</button>
+          </div>`;
+      }).join('');
+      return `<div class="gastos-group-day" style="margin-top:16px"><div class="gastos-day-label">Parcelamentos do mês</div>${rows}</div>`;
+    })()}
   `;
   setTimeout(atualizarSubcatList, 0);
 }
