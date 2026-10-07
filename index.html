@@ -1090,19 +1090,20 @@ function renderDashboard() {
   const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
   const totalPago         = commitments.reduce((s,c) => s + Number(c.paid || 0), 0);
 
-  // Gasto real por categoria ('' = sem categoria). Uma única fonte para hero, pace e ranking:
-  //  - lançamentos da aba Gastos — menos os gerados por pagamento de conta no crédito,
-  //    porque essa conta já entra pelo valor pago (evita contar duas vezes);
-  //  - automáticos (Netflix, Spotify…): contam pelo planejado, cobram sozinhos;
-  //  - contas manuais/pontuais: contam pelo que já foi pago.
+  // Gasto por categoria ('' = sem categoria). Uma única fonte, sem contar nada duas vezes:
+  //  - lançamentos (aba Gastos). Pagar uma conta cria um lançamento ligado ao pagamento,
+  //    então ele já está aqui — por isso o valor pago NÃO é somado de novo;
+  //  - automáticos (Netflix, Spotify…): contam pelo planejado, cobram sozinhos.
   const gastoPorCat = {};
   const somar = (catId, v) => { const k = catId || ''; gastoPorCat[k] = (gastoPorCat[k] || 0) + v; };
-  spendingEntries.filter(e => !e.payment_id).forEach(e => somar(e.category_id, Number(e.amount)));
-  commitments.forEach(c => {
-    if (c.recurrence_type === 'automatico') somar(c.category_id, Number(c.planned_amount));
-    else if (Number(c.paid) > 0)            somar(c.category_id, Number(c.paid));
-  });
+  spendingEntries.forEach(e => somar(e.category_id, Number(e.amount)));
+  commitments.filter(c => c.recurrence_type === 'automatico')
+    .forEach(c => somar(c.category_id, Number(c.planned_amount)));
   const totalGasto = Object.values(gastoPorCat).reduce((s, v) => s + v, 0);
+
+  // Previsto por categoria = tudo que foi lançado no Planejamento para ela.
+  const previstoPorCat = {};
+  commitments.forEach(c => { const k = c.category_id || ''; previstoPorCat[k] = (previstoPorCat[k] || 0) + Number(c.planned_amount); });
 
   // Sobra Projetada: por categoria com plano usa max(planejado, gasto real) — o excedente reduz
   // a projeção; categorias sem plano entram pelo gasto real.
@@ -1132,39 +1133,45 @@ function renderDashboard() {
     spendByCat[key].spent += v;
   });
 
-  const catsWithBudget = categories.filter(c => getLimitForCategory(c.id) !== null);
-  const paceHtml = catsWithBudget.map(cat => {
-    const lim   = getLimitForCategory(cat.id);
-    const spent = (spendByCat[cat.name] || {spent:0}).spent;
-    const pct   = lim > 0 ? Math.min((spent/lim)*100, 120) : 0;
+  // Uma linha por categoria: gasto × previsto (Planejamento). Sem previsto, vale o teto do Perfil.
+  const linhas = [...new Set([...Object.keys(previstoPorCat), ...Object.keys(gastoPorCat)])].map(k => {
+    const cat    = k ? categories.find(c => c.id === k) : null;
+    const spent  = gastoPorCat[k] || 0;
+    const previsto = previstoPorCat[k] || 0;
+    const teto   = k ? getLimitForCategory(k) : null;
+    const budget = previsto > 0 ? previsto : (teto || 0);
+    return { k, cat: cat || { id: null, name: 'Sem categoria' }, spent, budget, deTeto: !(previsto > 0) && !!teto };
+  }).filter(l => l.budget > 0 || l.spent > 0)
+    .sort((a, b) => (b.budget || b.spent) - (a.budget || a.spent));
+
+  const paceHtml = linhas.map(l => {
+    if (!(l.budget > 0)) {
+      return `
+      <div class="pace-card sem-teto" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(l.k)}')">
+        <div class="pace-header">
+          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</div>
+          <div class="pace-badge sem-teto-badge">sem previsão</div>
+        </div>
+        <div class="pace-amounts"><span>Gasto R$ ${fmt(l.spent)}</span></div>
+      </div>`;
+    }
+    const pct    = (l.spent / l.budget) * 100;
     const barPct = Math.min(pct, 100);
     const barClass   = pct>=100 ? 'red' : pct>=80 ? 'amber' : '';
     const badgeClass = pct>=100 ? 'over' : pct>=80 ? 'warn' : 'ok';
-    const badgeText  = pct>=100 ? `+R$${fmt(spent-lim)}` : `${pct.toFixed(0)}%`;
+    const resta = l.budget - l.spent;
+    const badgeText  = resta < -0.005 ? `+R$ ${fmt(-resta)}` : `${pct.toFixed(0)}%`;
     return `
-      <div class="pace-card" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(cat.id)}')">
+      <div class="pace-card" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(l.k)}')">
         <div class="pace-header">
-          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(cat,'sm')} ${esc(cat.name)}</div>
+          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</div>
           <div class="pace-badge ${badgeClass}">${badgeText}</div>
         </div>
-        <div class="pace-amounts"><span>R$ ${fmt(spent)}</span><span>Teto: R$ ${fmt(lim)}</span></div>
+        <div class="pace-amounts"><span>Gasto R$ ${fmt(l.spent)}</span><span>${l.deTeto ? 'Teto' : 'Previsto'} R$ ${fmt(l.budget)}</span></div>
         <div class="progress-bar"><div class="progress-fill ${barClass}" style="width:${barPct}%"></div></div>
+        <div class="pace-amounts" style="margin:6px 0 0"><span>${resta >= -0.005 ? `Resta R$ ${fmt(Math.max(resta,0))}` : `Passou R$ ${fmt(-resta)}`}</span></div>
       </div>`;
   }).join('');
-
-  // Categorias com gastos reais mas sem teto definido
-  const budgetCatIds = new Set(catsWithBudget.map(c => c.id));
-  const semTetoHtml = Object.entries(spendByCat)
-    .filter(([, d]) => d.spent > 0 && !budgetCatIds.has(d.catId))
-    .sort((a, b) => b[1].spent - a[1].spent)
-    .map(([name, d]) => `
-      <div class="pace-card sem-teto" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(d.catId)}')">
-        <div class="pace-header">
-          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(d.cat,'sm')} ${esc(name)}</div>
-          <div class="pace-badge sem-teto-badge">sem teto</div>
-        </div>
-        <div class="pace-amounts"><span>R$ ${fmt(d.spent)}</span></div>
-      </div>`).join('');
 
   const sorted = Object.entries(spendByCat).sort((a,b) => b[1].spent - a[1].spent);
   const maxSpent = sorted.length ? sorted[0][1].spent : 1;
@@ -1176,16 +1183,13 @@ function renderDashboard() {
       <div class="top-val">R$${fmt(d.spent)}</div>
     </div>`).join('');
 
-  const overBudget = Object.entries(spendByCat).filter(([n,d]) => {
-    const lim = getLimitForCategory(d.catId);
-    return lim && d.spent > lim;
-  });
+  const overBudget = linhas.filter(l => l.budget > 0 && l.spent > l.budget + 0.005);
 
   el.innerHTML = `
     <div class="hero">
       <div class="hero-eyebrow">Sobra Real</div>
       <div class="hero-number ${realClass}">R$ ${fmt(sobraReal)}</div>
-      <div class="hero-sub">Entradas − gastos e contas pagas</div>
+      <div class="hero-sub">Entradas − gastos do mês</div>
       <div class="hero-chips">
         <span class="hero-chip">Entradas R$ ${fmt(totalEntradas)}</span>
         <span class="hero-chip ${projClass}">Projetada R$ ${fmt(sobraProjetada)}</span>
@@ -1194,11 +1198,10 @@ function renderDashboard() {
     <div class="hero-divider"></div>
 
     ${overBudget.length > 0 ? `
-      <div class="sec-title">Acima do teto</div>
-      ${overBudget.map(([n,d]) => {
-        const lim = getLimitForCategory(d.catId);
-        return `<div class="alert-item"><span class="name" style="display:flex;align-items:center;gap:6px">${catAvatar(d.cat,'sm')} ${esc(n)}</span><span class="val">+R$ ${fmt(d.spent-lim)}</span></div>`;
-      }).join('')}` : ''}
+      <div class="sec-title">Acima do previsto</div>
+      ${overBudget.map(l =>
+        `<div class="alert-item"><span class="name" style="display:flex;align-items:center;gap:6px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</span><span class="val">+R$ ${fmt(l.spent-l.budget)}</span></div>`
+      ).join('')}` : ''}
 
     <div class="sec-title">Resumo do mês</div>
     <div class="kpi-grid">
@@ -1214,7 +1217,7 @@ function renderDashboard() {
       </div>
     </div>
 
-    ${(catsWithBudget.length > 0 || semTetoHtml) ? `<div class="sec-title">Pace por categoria</div>${paceHtml}${semTetoHtml}` : ''}
+    ${paceHtml ? `<div class="sec-title">Gasto × previsto por categoria</div>${paceHtml}` : ''}
     ${sorted.length > 0 ? `<div class="sec-title">Todos os gastos</div>${topHtml}` : ''}
   `;
 }
@@ -1464,8 +1467,9 @@ async function abrirPagamentoModal(id) {
     </div>
     <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pago com</div>
     <div class="method-grid">${pmOpts || '<div style="color:var(--text-3);font-size:13px;padding:8px">Nenhum método cadastrado</div>'}</div>
+    <div style="font-size:11px;color:var(--text-3);margin:-4px 0 12px">O valor entra nos gastos da categoria deste mês.</div>
     <div id="credit-note" style="display:none;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:12px">
-      Lançado na fatura do cartão (próximo mês).
+      Soma na fatura do cartão (próximo mês) e no gasto da categoria.
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
@@ -1507,7 +1511,6 @@ async function confirmarPagamento(id, concluir = true) {
 
   const sel    = document.querySelector('.method-opt.selected');
   const pmId   = sel?.dataset.pmId   || null;
-  const pmType = sel?.dataset.pmType || null;
   const totalPago = Number(c.paid) + val;
 
   _salvandoPag = true;
@@ -1517,9 +1520,8 @@ async function confirmarPagamento(id, concluir = true) {
   try {
     const pag = await insertPayment(id, val, pmId, null);
     pagId = pag.id;
-    if (pmType === 'credito' && pmId) {
-      await insertSpending(c.category_id || null, pmId, val, c.name, dataNoMes(), pagId);
-    }
+    // O lançamento é o que conta no gasto da categoria (Dashboard) e, no crédito, na fatura
+    await insertSpending(c.category_id || null, pmId, val, c.name, dataNoMes(), pagId);
     if (concluir) {
       // "Concluir" fixa o previsto no valor realmente pago
       const { error } = await sb.from('fin_commitments').update({ planned_amount: totalPago }).eq('id', id);
@@ -2225,12 +2227,15 @@ document.addEventListener('click', e => {
 });
 
 async function deletarGasto(id) {
-  if (!confirm('Remover este lançamento?')) return;
-  const { error } = await sb.from('fin_spending_entries').delete().eq('id', id);
+  const e = spendingEntries.find(x => x.id === id);
+  const doPagamento = !!(e && e.payment_id);
+  if (!confirm(doPagamento ? 'Este lançamento veio do pagamento de uma conta. Remover também desfaz o pagamento. Continuar?' : 'Remover este lançamento?')) return;
+  // Pagamento e lançamento são um só: apagar o pagamento remove o lançamento em cascata
+  const { error } = doPagamento
+    ? await sb.from('fin_commitment_payments').delete().eq('id', e.payment_id)
+    : await sb.from('fin_spending_entries').delete().eq('id', id);
   if (error) { showToast('Erro ao remover','error'); return; }
-  spendingEntries = spendingEntries.filter(e => e.id!==id);
-  dirtyTabs.add('dashboard'); dirtyTabs.add('pagar');
-  renderGastos();
+  await loadMes();
   showToast('Lançamento removido','success');
 }
 
@@ -2426,7 +2431,10 @@ function editarLancamentoFatura(id) {
 async function salvarLancamentoFatura(id) {
   const valor = parseFloat(document.getElementById('lancamento-valor')?.value);
   if (!valor || valor <= 0) { showToast('Valor inválido','error'); return; }
-  const { error } = await sb.from('fin_spending_entries').update({ amount: valor }).eq('id', id);
+  const e = spendingEntries.find(x => x.id === id);
+  let { error } = await sb.from('fin_spending_entries').update({ amount: valor }).eq('id', id);
+  // Lançamento de pagamento de conta: mantém o valor pago igual ao lançado
+  if (!error && e && e.payment_id) ({ error } = await sb.from('fin_commitment_payments').update({ amount: valor }).eq('id', e.payment_id));
   if (error) { showToast('Erro ao atualizar','error'); return; }
   fecharModal();
   await loadMes();
@@ -2623,13 +2631,11 @@ function abrirCatDrilldown(catId) {
   const daCat   = c => (c.category_id || '') === (catId || '');
   // Mesmas regras do Dashboard, para o total bater com o card que foi tocado.
   const catCommitments = commitments.filter(c => daCat(c) && c.recurrence_type === 'automatico');
-  const catPagas       = commitments.filter(c => daCat(c) && c.recurrence_type !== 'automatico' && Number(c.paid) > 0);
-  const catEntries = spendingEntries.filter(e => daCat({ category_id: e.category_id }) && !e.payment_id)
+  const catEntries = spendingEntries.filter(e => daCat({ category_id: e.category_id }))
     .sort((a,b) => (b.spend_date||'').localeCompare(a.spend_date||''));
   const totalAuto   = catCommitments.reduce((s,c) => s + Number(c.planned_amount), 0);
-  const totalPagas  = catPagas.reduce((s,c) => s + Number(c.paid), 0);
   const totalManual = catEntries.reduce((s,e) => s + Number(e.amount), 0);
-  const totalCat    = totalAuto + totalPagas + totalManual;
+  const totalCat    = totalAuto + totalManual;
 
   const linha = (nome, valor) => `
       <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
@@ -2640,8 +2646,6 @@ function abrirCatDrilldown(catId) {
 
   const commitRowsHtml = catCommitments.length
     ? titulo('Automáticos') + catCommitments.map(c => linha(c.name, c.planned_amount)).join('') : '';
-  const pagasRowsHtml = catPagas.length
-    ? titulo('Contas pagas') + catPagas.map(c => linha(c.name, c.paid)).join('') : '';
 
   const entryRowsHtml = catEntries.length ? `
     ${titulo('Lançamentos')}
@@ -2658,7 +2662,7 @@ function abrirCatDrilldown(catId) {
         </div>`;
     }).join('')}` : '';
 
-  const emptyHtml = !catCommitments.length && !catPagas.length && !catEntries.length
+  const emptyHtml = !catCommitments.length && !catEntries.length
     ? '<div style="text-align:center;color:var(--text-3);padding:24px 0;font-size:13px">Nenhum lançamento nesta categoria</div>' : '';
 
   document.getElementById('modal-content').innerHTML = `
@@ -2668,7 +2672,7 @@ function abrirCatDrilldown(catId) {
       <div style="font-size:26px;font-weight:700;color:var(--text-1)">R$ ${fmt(totalCat)}</div>
       <div style="font-size:12px;color:var(--text-3);margin-top:2px">total no mês</div>
     </div>
-    ${commitRowsHtml}${pagasRowsHtml}${entryRowsHtml}${emptyHtml}
+    ${commitRowsHtml}${entryRowsHtml}${emptyHtml}
     <div class="modal-footer">
       <button class="btn-cancel" onclick="fecharModal()">Fechar</button>
     </div>`;
