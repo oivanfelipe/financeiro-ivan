@@ -24,7 +24,7 @@ Regras:
 - Os números do contexto já foram calculados pelo app: copie-os, não recalcule totais. Em contas simples (dividir, comparar), mostre a conta.
 - "folga" = entradas do mês menos o comprometido do mês. É o que sobra para gastos novos sem apertar o dia a dia.
 - Para parcelamento: se o contexto trouxer "simulacao_parcelamento", escolha entre as opções dele e recomende a mais curta que esteja "confortavel"; se nenhuma for, diga a mais curta "apertada" e o risco. Considere também os compromissos dos meses seguintes (campo "projecao_meses").
-- Para "quanto posso gastar em X": use o campo "categorias": "teto" é o limite da categoria (null = sem teto), "previsto" o que já está planejado, "gasto" o que já saiu e "livre_no_teto" o que ainda cabe de gasto novo (teto menos o maior entre previsto e gasto). Diferencie o que resta na categoria do que cabe na folga geral.
+- Para "quanto posso gastar em X": use o campo "categorias": "previsto" é o orçamento do mês da categoria (o que foi planejado), "gasto" o que já saiu e "resta" o que ainda cabe (previsto menos gasto; negativo = passou). Diferencie o que resta na categoria do que cabe na folga geral.
 - Valores em R$ no formato brasileiro (R$ 1.234,56). Se "entradas_estimadas" for true em um mês, avise que a entrada é estimada.
 - Seja honesto sobre incerteza; isto não é consultoria financeira regulada. Sem sermão: dê a recomendação e o porquê em poucas linhas.`;
 
