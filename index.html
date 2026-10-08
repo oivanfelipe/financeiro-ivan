@@ -181,6 +181,9 @@
     .progress-bar { background: var(--surface2); border-radius: 99px; height: 6px; overflow: hidden; }
     .progress-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; background: var(--green); }
     .progress-fill.amber { background: var(--amber); }
+    .progress-bar.layered { position: relative; }
+    .progress-bar.layered .progress-fill { position: absolute; left: 0; top: 0; }
+    .progress-bar.layered .progress-fill.plan { opacity: .3; }
     .progress-fill.red   { background: var(--red); }
 
     /* ── DASHBOARD KPI ── */
@@ -1160,6 +1163,24 @@ function calcMes() {
   };
 }
 
+// Uma linha por categoria. O limite é o TETO do Perfil; o previsto (Planejamento) já ocupa parte dele.
+//  comprometido = max(previsto, gasto) — mesma regra da Sobra Projetada;  livre = limite − comprometido.
+// Categoria sem teto: o limite passa a ser o próprio previsto.
+function linhasCategorias() {
+  const { gastoPorCat, previstoPorCat } = calcMes();
+  return [...new Set([...Object.keys(previstoPorCat), ...Object.keys(gastoPorCat)])].map(k => {
+    const cat      = k ? categories.find(c => c.id === k) : null;
+    const gasto    = gastoPorCat[k] || 0;
+    const previsto = previstoPorCat[k] || 0;
+    const teto     = k ? Number(getLimitForCategory(k)) || 0 : 0;
+    const limite   = teto > 0 ? teto : previsto;
+    const comprometido = Math.max(previsto, gasto);
+    return { k, cat: cat || { id: null, name: 'Sem categoria' }, gasto, previsto, teto: teto > 0 ? teto : null,
+             limite, comprometido, livre: limite - comprometido };
+  }).filter(l => l.limite > 0 || l.gasto > 0)
+    .sort((a, b) => (b.limite || b.gasto) - (a.limite || a.gasto));
+}
+
 function renderDashboard() {
   const el = document.getElementById('dash-root');
   const { totalEntradas, totalComprometido, totalPago, gastoPorCat, previstoPorCat, sobraProjetada, sobraReal } = calcMes();
@@ -1176,43 +1197,36 @@ function renderDashboard() {
     spendByCat[key].spent += v;
   });
 
-  // Uma linha por categoria: gasto × previsto (Planejamento). Sem previsto, vale o teto do Perfil.
-  const linhas = [...new Set([...Object.keys(previstoPorCat), ...Object.keys(gastoPorCat)])].map(k => {
-    const cat    = k ? categories.find(c => c.id === k) : null;
-    const spent  = gastoPorCat[k] || 0;
-    const previsto = previstoPorCat[k] || 0;
-    const teto   = k ? getLimitForCategory(k) : null;
-    const budget = previsto > 0 ? previsto : (teto || 0);
-    return { k, cat: cat || { id: null, name: 'Sem categoria' }, spent, budget, deTeto: !(previsto > 0) && !!teto };
-  }).filter(l => l.budget > 0 || l.spent > 0)
-    .sort((a, b) => (b.budget || b.spent) - (a.budget || a.spent));
+  const linhas = linhasCategorias();
 
   const paceHtml = linhas.map(l => {
-    if (!(l.budget > 0)) {
+    const onclick = `abrirCatDrilldown('${esc(l.k)}')`;
+    const nome = `<div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</div>`;
+    if (!(l.limite > 0)) {   // só gasto, sem teto e sem previsto
       return `
-      <div class="pace-card sem-teto" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(l.k)}')">
-        <div class="pace-header">
-          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</div>
-          <div class="pace-badge sem-teto-badge">sem previsão</div>
-        </div>
-        <div class="pace-amounts"><span>Gasto R$ ${fmt(l.spent)}</span></div>
+      <div class="pace-card sem-teto" style="cursor:pointer" onclick="${onclick}">
+        <div class="pace-header">${nome}<div class="pace-badge sem-teto-badge">sem teto</div></div>
+        <div class="pace-amounts"><span>Gasto R$ ${fmt(l.gasto)}</span></div>
       </div>`;
     }
-    const pct    = (l.spent / l.budget) * 100;
-    const barPct = Math.min(pct, 100);
-    const barClass   = pct>=100 ? 'red' : pct>=80 ? 'amber' : '';
-    const badgeClass = pct>=100 ? 'over' : pct>=80 ? 'warn' : 'ok';
-    const resta = l.budget - l.spent;
-    const badgeText  = resta < -0.005 ? `+R$ ${fmt(-resta)}` : `${pct.toFixed(0)}%`;
+    const pct = l.comprometido / l.limite * 100;
+    const barClass   = pct > 100 ? 'red' : pct >= 80 ? 'amber' : '';
+    const badgeClass = pct > 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
+    const badgeText  = l.livre < -0.005 ? `+R$ ${fmt(-l.livre)}` : `${pct.toFixed(0)}%`;
+    const wPlan  = Math.min(l.comprometido / l.limite * 100, 100);
+    const wGasto = Math.min(l.gasto / l.limite * 100, 100);
     return `
-      <div class="pace-card" style="cursor:pointer" onclick="abrirCatDrilldown('${esc(l.k)}')">
-        <div class="pace-header">
-          <div class="pace-name" style="display:flex;align-items:center;gap:8px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</div>
-          <div class="pace-badge ${badgeClass}">${badgeText}</div>
+      <div class="pace-card" style="cursor:pointer" onclick="${onclick}">
+        <div class="pace-header">${nome}<div class="pace-badge ${badgeClass}">${badgeText}</div></div>
+        <div class="pace-amounts"><span>Gasto R$ ${fmt(l.gasto)}</span><span>${l.teto ? 'Teto' : 'Previsto (sem teto)'} R$ ${fmt(l.limite)}</span></div>
+        <div class="progress-bar layered">
+          <div class="progress-fill plan ${barClass}" style="width:${wPlan}%"></div>
+          <div class="progress-fill ${barClass}" style="width:${wGasto}%"></div>
         </div>
-        <div class="pace-amounts"><span>Gasto R$ ${fmt(l.spent)}</span><span>${l.deTeto ? 'Teto' : 'Previsto'} R$ ${fmt(l.budget)}</span></div>
-        <div class="progress-bar"><div class="progress-fill ${barClass}" style="width:${barPct}%"></div></div>
-        <div class="pace-amounts" style="margin:6px 0 0"><span>${resta >= -0.005 ? `Resta R$ ${fmt(Math.max(resta,0))}` : `Passou R$ ${fmt(-resta)}`}</span></div>
+        <div class="pace-amounts" style="margin:6px 0 0">
+          <span>${l.teto ? `Previsto R$ ${fmt(l.previsto)}` : ''}</span>
+          <span>${l.livre >= -0.005 ? `Livre R$ ${fmt(Math.max(l.livre,0))}` : `Passou R$ ${fmt(-l.livre)}`}</span>
+        </div>
       </div>`;
   }).join('');
 
@@ -1226,7 +1240,7 @@ function renderDashboard() {
       <div class="top-val">R$${fmt(d.spent)}</div>
     </div>`).join('');
 
-  const overBudget = linhas.filter(l => l.budget > 0 && l.spent > l.budget + 0.005);
+  const overBudget = linhas.filter(l => l.limite > 0 && l.livre < -0.005);
 
   el.innerHTML = `
     <div class="hero">
@@ -1241,9 +1255,9 @@ function renderDashboard() {
     <div class="hero-divider"></div>
 
     ${overBudget.length > 0 ? `
-      <div class="sec-title">Acima do previsto</div>
+      <div class="sec-title">Acima do teto</div>
       ${overBudget.map(l =>
-        `<div class="alert-item"><span class="name" style="display:flex;align-items:center;gap:6px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</span><span class="val">+R$ ${fmt(l.spent-l.budget)}</span></div>`
+        `<div class="alert-item"><span class="name" style="display:flex;align-items:center;gap:6px">${catAvatar(l.cat,'sm')} ${esc(l.cat.name)}</span><span class="val">+R$ ${fmt(-l.livre)}</span></div>`
       ).join('')}` : ''}
 
     <div class="sec-title">Resumo do mês</div>
@@ -1260,7 +1274,7 @@ function renderDashboard() {
       </div>
     </div>
 
-    ${paceHtml ? `<div class="sec-title">Gasto × previsto por categoria</div>${paceHtml}` : ''}
+    ${paceHtml ? `<div class="sec-title">Teto, previsto e gasto por categoria</div>${paceHtml}` : ''}
     ${sorted.length > 0 ? `<div class="sec-title">Todos os gastos</div>${topHtml}` : ''}
   `;
 }
@@ -2788,11 +2802,10 @@ function simularParcelamento(valor, folgas, folgaMedia) {
 
 async function montarContextoIA(pergunta) {
   const r = calcMes();
-  const nomeCat = k => k ? ((categories.find(c => c.id === k) || {}).name || 'Sem categoria') : 'Sem categoria';
 
-  const categoriasCtx = [...new Set([...Object.keys(r.previstoPorCat), ...Object.keys(r.gastoPorCat)])].map(k => ({
-    categoria: nomeCat(k), previsto: arred(r.previstoPorCat[k]), gasto: arred(r.gastoPorCat[k]),
-    resta: arred((r.previstoPorCat[k] || 0) - (r.gastoPorCat[k] || 0))
+  const categoriasCtx = linhasCategorias().map(l => ({
+    categoria: l.cat.name, teto: l.teto === null ? null : arred(l.teto), previsto: arred(l.previsto), gasto: arred(l.gasto),
+    livre_no_teto: arred(l.livre)   // limite − max(previsto, gasto); sem teto, o limite é o previsto
   }));
 
   // Próximos 12 meses a partir do mês aberto
