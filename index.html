@@ -904,9 +904,12 @@ function avisar(html, tipo) {
 
 function mesLabel(m, y) { return `${MESES[m-1]} ${y}`; }
 
+// Quanto ainda falta pagar. "Concluir" marca a conta como quitada (settled) sem mexer no previsto.
+function faltaConta(c) { return c.settled ? 0 : Math.max(Number(c.remaining) || 0, 0); }
+
 function statusConta(item, venc) {
   const pct = item.planned_amount > 0 ? (item.paid / item.planned_amount) : 0;
-  if (pct >= 0.9995) return 'pago';
+  if (item.settled || pct >= 0.9995) return 'pago';
   if (item.paid > 0) return 'parcial';
   if (item.type === 'fatura') return 'fatura';
   if (!venc) return 'futuro';
@@ -1022,7 +1025,7 @@ async function loadMes() {
     sb.from('fin_spending_summary').select('*').eq('month', mesAtual).eq('year', anoAtual),
     sb.from('fin_income_entries').select('*').eq('month', mesAtual).eq('year', anoAtual).order('entry_date'),
     sb.from('fin_income_entries').select('*').eq('month', prev.month).eq('year', prev.year).order('entry_date'),
-    sb.from('fin_commitments').select('id, default_payment_method_id, recurrence_type').eq('month', mesAtual).eq('year', anoAtual)
+    sb.from('fin_commitments').select('id, default_payment_method_id, recurrence_type, settled').eq('month', mesAtual).eq('year', anoAtual)
   ]);
   if (seq !== loadSeq) return false;
 
@@ -1043,7 +1046,9 @@ async function loadMes() {
 
   const pmMap  = Object.fromEntries((rawCmts.data||[]).map(r => [r.id, r.default_payment_method_id]));
   const recMap = Object.fromEntries((rawCmts.data||[]).map(r => [r.id, r.recurrence_type]));
+  const setMap = Object.fromEntries((rawCmts.data||[]).map(r => [r.id, !!r.settled]));
   commitments.forEach(c => {
+    c.settled = !!setMap[c.id];
     c.default_payment_method_id = pmMap[c.id] || null;
     c.recurrence_type = recMap[c.id] || 'manual';
   });
@@ -1345,7 +1350,7 @@ function buildContaCard(c) {
   const venc   = c.due_day;
   const status = statusConta(c, venc);
   const paid   = Number(c.paid);
-  const rem    = Number(c.remaining);
+  const rem    = faltaConta(c);
   const plan   = Number(c.planned_amount);
   const pct    = plan > 0 ? Math.min((paid/plan)*100, 100) : 0;
   const barClass = pct>=100 ? 'green' : pct>=50 ? 'amber' : '';
@@ -1489,10 +1494,19 @@ async function abrirPagamentoModal(id) {
   }, 100);
 }
 
+// Apaga o pagamento (o lançamento de fatura ligado a ele sai junto, em cascata, pelo banco)
+// e reabre a conta, que deixa de estar "quitada".
+async function apagarPagamento(pagId) {
+  const { data: pg } = await sb.from('fin_commitment_payments').select('commitment_id').eq('id', pagId).maybeSingle();
+  const { error } = await sb.from('fin_commitment_payments').delete().eq('id', pagId);
+  if (error) return { error };
+  if (pg) await sb.from('fin_commitments').update({ settled: false }).eq('id', pg.commitment_id);
+  return { error: null };
+}
+
 async function deletarPagamento(pagId, commitmentId) {
   if (!confirm('Excluir este pagamento?')) return;
-  // O lançamento de fatura gerado por ele (payment_id) é apagado junto, em cascata, pelo banco.
-  const { error } = await sb.from('fin_commitment_payments').delete().eq('id', pagId);
+  const { error } = await apagarPagamento(pagId);
   if (error) { showToast('Erro: '+error.message,'error'); return; }
   await loadMes();
   showToast('Pagamento removido','success');
@@ -1517,7 +1531,6 @@ async function confirmarPagamento(id, concluir = true) {
 
   const sel    = document.querySelector('.method-opt.selected');
   const pmId   = sel?.dataset.pmId   || null;
-  const totalPago = Number(c.paid) + val;
 
   _salvandoPag = true;
   document.querySelectorAll('#modal-content .modal-footer button').forEach(b => b.disabled = true);
@@ -1529,8 +1542,8 @@ async function confirmarPagamento(id, concluir = true) {
     // O lançamento é o que conta no gasto da categoria (Dashboard) e, no crédito, na fatura
     await insertSpending(c.category_id || null, pmId, val, c.name, dataNoMes(), pagId);
     if (concluir) {
-      // "Concluir" fixa o previsto no valor realmente pago
-      const { error } = await sb.from('fin_commitments').update({ planned_amount: totalPago }).eq('id', id);
+      // "Concluir" quita a conta; o previsto (limite da categoria) continua como foi planejado
+      const { error } = await sb.from('fin_commitments').update({ settled: true }).eq('id', id);
       if (error) throw error;
     }
     fecharModal();
@@ -1862,8 +1875,8 @@ function renderPagar() {
   // Só contas COM vencimento e que precisam ser pagas à mão — automáticos cobram sozinhos
   const pagarCmts = commitments.filter(c => c.due_day != null && c.recurrence_type !== 'automatico');
 
-  const totalFaltante = pagarCmts.reduce((s,c) => s + Math.max(Number(c.remaining),0), 0);
-  const qtdQuitadas   = pagarCmts.filter(c => Number(c.remaining) <= 0.005).length;
+  const totalFaltante = pagarCmts.reduce((s,c) => s + faltaConta(c), 0);
+  const qtdQuitadas   = pagarCmts.filter(c => faltaConta(c) <= 0.005).length;
 
   const sorted = [...pagarCmts].sort((a,b) => prioridadeConta(a)-prioridadeConta(b) || (a.due_day||99)-(b.due_day||99));
   const PRIO_LABEL = ['Vencidas','Vencidas (parcial)','Hoje','Esta semana','Próximas','Pagas','Futuras'];
@@ -2238,7 +2251,7 @@ async function deletarGasto(id) {
   if (!confirm(doPagamento ? 'Este lançamento veio do pagamento de uma conta. Remover também desfaz o pagamento. Continuar?' : 'Remover este lançamento?')) return;
   // Pagamento e lançamento são um só: apagar o pagamento remove o lançamento em cascata
   const { error } = doPagamento
-    ? await sb.from('fin_commitment_payments').delete().eq('id', e.payment_id)
+    ? await apagarPagamento(e.payment_id)
     : await sb.from('fin_spending_entries').delete().eq('id', id);
   if (error) { showToast('Erro ao remover','error'); return; }
   await loadMes();
@@ -2733,8 +2746,8 @@ async function montarContextoIA(pergunta) {
     sobra_real: arred(r.sobraReal), sobra_projetada: arred(r.sobraProjetada),
     folga_media_proximos_6_meses: arred(folgaMedia),
     categorias: categoriasCtx,
-    contas_a_pagar_pendentes: commitments.filter(c => c.recurrence_type !== 'automatico' && Number(c.remaining) > 0.005)
-      .map(c => ({ conta: c.name, falta: arred(c.remaining), dia: c.due_day })),
+    contas_a_pagar_pendentes: commitments.filter(c => c.recurrence_type !== 'automatico' && faltaConta(c) > 0.005)
+      .map(c => ({ conta: c.name, falta: arred(faltaConta(c)), dia: c.due_day })),
     faturas_cartao: faturas,
     projecao_meses: projecao
   };
