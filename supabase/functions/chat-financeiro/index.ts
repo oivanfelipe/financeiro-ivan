@@ -34,7 +34,13 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  const apiKey = Deno.env.get("GROQ_API_KEY");
+  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  // Prefere o secret da Edge Function; se não houver, lê da tabela app_secrets (RLS sem políticas: só a service role acessa)
+  let apiKey = Deno.env.get("GROQ_API_KEY");
+  if (!apiKey) {
+    const { data } = await db.from("app_secrets").select("value").eq("name", "GROQ_API_KEY").maybeSingle();
+    apiKey = data?.value;
+  }
   if (!apiKey) return json({ error: "not_configured" }, 503);
 
   let body: { messages?: unknown; context?: unknown };
@@ -50,7 +56,6 @@ Deno.serve(async (req) => {
   const contexto = JSON.stringify(body.context ?? {}).slice(0, MAX_CHARS_CONTEXTO);
 
   // Limite diário (protege a cota do Groq, já que o app não tem login)
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const dia = new Date().toISOString().slice(0, 10);
   const { data: uso } = await db.from("ai_usage").select("count").eq("day", dia).maybeSingle();
   const n = (uso?.count ?? 0) + 1;
