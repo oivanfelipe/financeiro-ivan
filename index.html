@@ -598,6 +598,34 @@
       border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.5; margin-bottom: 14px;
     }
     #aviso-global { padding: 0 16px; }
+
+    /* ── ASSISTENTE ── */
+    .chat-wrap { display: flex; flex-direction: column; min-height: calc(100vh - var(--nav-h) - 96px); }
+    .chat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .chat-title { font-size: 16px; font-weight: 700; color: var(--text-1); }
+    .chat-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .chat-clear { background: none; border: 1px solid var(--border); color: var(--text-2); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+    .chat-msgs { flex: 1; display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+    .chat-bubble { max-width: 88%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
+    .chat-bubble p { margin: 0 0 6px; } .chat-bubble p:last-child { margin-bottom: 0; }
+    .chat-bubble ul { margin: 4px 0 6px 18px; } .chat-bubble li { margin-bottom: 3px; }
+    .chat-bubble.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-bubble.bot  { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); color: var(--text-1); border-bottom-left-radius: 4px; }
+    .chat-bubble.erro { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+    .chat-typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+    .chat-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); animation: chatdot 1s infinite ease-in-out; }
+    .chat-typing span:nth-child(2) { animation-delay: .15s; } .chat-typing span:nth-child(3) { animation-delay: .3s; }
+    @keyframes chatdot { 0%,80%,100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+    .chat-intro { text-align: center; padding: 18px 8px 8px; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+    .chat-chips { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .chat-chip { text-align: left; background: var(--surface); border: 1px solid var(--border); color: var(--text-1); border-radius: 12px; padding: 12px 14px; font-size: 13px; cursor: pointer; }
+    .chat-chip:hover { border-color: var(--accent); }
+    .chat-compose { position: sticky; bottom: calc(var(--nav-h) + max(env(safe-area-inset-bottom), 12px)); background: var(--bg); padding: 8px 0 10px; display: flex; gap: 8px; align-items: flex-end; border-top: 1px solid var(--border); }
+    .chat-compose textarea { flex: 1; resize: none; max-height: 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 11px 14px; color: var(--text-1); outline: none; line-height: 1.4; }
+    .chat-compose textarea:focus { border-color: var(--accent); }
+    .chat-send { width: 44px; height: 44px; flex-shrink: 0; border: none; border-radius: 50%; background: var(--accent); color: #fff; font-size: 20px; cursor: pointer; }
+    .chat-send:disabled { opacity: .45; cursor: default; }
+    .chat-priv { font-size: 10px; color: var(--text-3); text-align: center; padding: 4px 0 0; }
   </style>
 </head>
 <body>
@@ -642,6 +670,9 @@
   <div id="tab-faturas" class="tab-content">
     <div id="faturas-root"></div>
   </div>
+  <div id="tab-assistente" class="tab-content">
+    <div id="assistente-root"></div>
+  </div>
   <div id="tab-perfil" class="tab-content">
     <div id="perfil-root"></div>
   </div>
@@ -666,6 +697,10 @@
   </button>
   <button class="nav-item" data-tab="faturas" onclick="switchTab('faturas')" aria-label="Faturas">
     <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+    <span class="nav-pip"></span>
+  </button>
+  <button class="nav-item" data-tab="assistente" onclick="switchTab('assistente')" aria-label="Assistente">
+    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     <span class="nav-pip"></span>
   </button>
   <button class="nav-item" data-tab="perfil" onclick="switchTab('perfil')" aria-label="Perfil">
@@ -1012,7 +1047,7 @@ async function copiarRecorrentes() {
 async function loadMes() {
   const seq = ++loadSeq;   // cliques rápidos de navegação: só a última resposta vale
   document.getElementById('mes-label').textContent = mesLabel(mesAtual, anoAtual);
-  dirtyTabs = new Set(['dashboard','planejamento','pagar','gastos','faturas','perfil']);
+  dirtyTabs = new Set(['dashboard','planejamento','pagar','gastos','faturas','assistente','perfil']);
 
   const prev = addMeses(mesAtual, anoAtual, -1);
 
@@ -1084,8 +1119,8 @@ async function insertPayment(commitmentId, amount, methodId, note, date) {
 }
 
 // === DASHBOARD ===
-function renderDashboard() {
-  const el = document.getElementById('dash-root');
+// Números do mês aberto — fonte única do Dashboard e do Assistente.
+function calcMes() {
   const totalEntradas     = incomeEntries.reduce((s,e) => s + Number(e.amount), 0);
   const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
   const totalPago         = commitments.reduce((s,c) => s + Number(c.paid || 0), 0);
@@ -1118,8 +1153,16 @@ function renderDashboard() {
     totalProjetado += Math.max(planejado, real);
   });
 
-  const sobraProjetada = totalEntradas - totalProjetado;
-  const sobraReal      = totalEntradas - totalGasto;
+  return {
+    totalEntradas, totalComprometido, totalPago, gastoPorCat, previstoPorCat, totalGasto, totalProjetado,
+    sobraProjetada: totalEntradas - totalProjetado,
+    sobraReal:      totalEntradas - totalGasto
+  };
+}
+
+function renderDashboard() {
+  const el = document.getElementById('dash-root');
+  const { totalEntradas, totalComprometido, totalPago, gastoPorCat, previstoPorCat, sobraProjetada, sobraReal } = calcMes();
   const totalPrevEntradas = prevIncomeEntries.reduce((s,e) => s + Number(e.amount), 0);
   const projClass = sobraProjetada >= 0 ? 'green' : 'red';
   const realClass = sobraReal >= 0 ? 'green' : 'red';
@@ -2685,6 +2728,204 @@ function fecharModal(e) {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
 
+// === ASSISTENTE (IA) ===
+// A chave do Groq fica no servidor (Edge Function "chat-financeiro"). O app calcula os números
+// (folga, projeção, simulação de parcelas) e manda a IA só interpretar — ela não faz as contas.
+const CHAT_KEY = 'chat_ia_hist';
+let chatMsgs = [];
+let chatCarregando = false;
+let chatRascunho = '';
+try {
+  const salvo = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
+  if (Array.isArray(salvo)) chatMsgs = salvo.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-30);
+} catch {}
+function salvarChat() {
+  try { localStorage.setItem(CHAT_KEY, JSON.stringify(chatMsgs.filter(m => !m.erro).slice(-30))); } catch {}
+}
+
+const arred = v => Math.round((Number(v) || 0) * 100) / 100;
+
+// Texto da IA → HTML seguro (escapa tudo primeiro; só **negrito** e listas com "-")
+function mdLite(t) {
+  let html = '', lista = false;
+  for (const l of esc(t).split('\n')) {
+    const m = l.match(/^\s*[-*•]\s+(.*)$/);
+    if (m) { if (!lista) { html += '<ul>'; lista = true; } html += `<li>${m[1]}</li>`; continue; }
+    if (lista) { html += '</ul>'; lista = false; }
+    if (l.trim()) html += `<p>${l}</p>`;
+  }
+  if (lista) html += '</ul>';
+  return html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+// Maior valor em reais citado na pergunta ("3000", "3.000,50", "R$ 3 mil", "3k"); ignora "12x", "6 meses"…
+function extrairValor(txt) {
+  let melhor = null;
+  for (const m of String(txt).matchAll(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?\s*(k|mil)?/gi)) {
+    const resto = txt.slice(m.index + m[0].length, m.index + m[0].length + 12).toLowerCase();
+    if (/^\s*(x\b|vezes|parcela|meses|mes\b|mês|dias|dia\b|%)/.test(resto)) continue;
+    let v = parseFloat(m[1].replace(/\./g, '') + (m[2] ? '.' + m[2] : ''));
+    if (m[3]) v *= 1000;
+    if (v >= 50 && (melhor === null || v > melhor)) melhor = v;
+  }
+  return melhor;
+}
+
+// Parcelas começam no mês aberto (igual ao lançamento parcelado do app).
+// "folgas": [{folga}] mês a mês; status: não cabe se algum mês fica negativo; confortável se a parcela ≤ 30% da folga média.
+function simularParcelamento(valor, folgas, folgaMedia) {
+  return [1, 2, 3, 4, 5, 6, 8, 10, 12].filter(n => n <= folgas.length).map(n => {
+    const parcela  = Math.round(valor / n * 100) / 100;
+    const piorFolga = Math.min(...folgas.slice(0, n).map(f => f.folga - parcela));
+    const pct = folgaMedia > 0 ? parcela / folgaMedia * 100 : null;
+    return {
+      parcelas: n, valor_parcela: arred(parcela), pior_folga_apos_parcela: arred(piorFolga),
+      pct_da_folga_media: pct === null ? null : Math.round(pct),
+      status: piorFolga < 0 ? 'nao_cabe' : (pct !== null && pct <= 30 ? 'confortavel' : 'apertado')
+    };
+  });
+}
+
+async function montarContextoIA(pergunta) {
+  const r = calcMes();
+  const nomeCat = k => k ? ((categories.find(c => c.id === k) || {}).name || 'Sem categoria') : 'Sem categoria';
+
+  const categoriasCtx = [...new Set([...Object.keys(r.previstoPorCat), ...Object.keys(r.gastoPorCat)])].map(k => ({
+    categoria: nomeCat(k), previsto: arred(r.previstoPorCat[k]), gasto: arred(r.gastoPorCat[k]),
+    resta: arred((r.previstoPorCat[k] || 0) - (r.gastoPorCat[k] || 0))
+  }));
+
+  // Próximos 12 meses a partir do mês aberto
+  const [cm, inc] = await Promise.all([
+    sb.from('fin_commitments').select('month, year, planned_amount').gte('year', anoAtual).lte('year', anoAtual + 1),
+    sb.from('fin_income_entries').select('month, year, amount').gte('year', anoAtual).lte('year', anoAtual + 1)
+  ]);
+  if (cm.error || inc.error) throw new Error('dados');
+  const somaMes = (rows, campo, m, y) => (rows || []).filter(x => x.month === m && x.year === y).reduce((a, x) => a + Number(x[campo]), 0);
+  const base = [];
+  for (let i = 0; i < 12; i++) {
+    const { month, year } = addMeses(mesAtual, anoAtual, i);
+    base.push({
+      month, year,
+      entradas: somaMes(inc.data, 'amount', month, year),
+      comprometido: i === 0 ? r.totalProjetado : somaMes(cm.data, 'planned_amount', month, year)
+    });
+  }
+  const conhecidas = base.map(b => b.entradas).filter(v => v > 0);
+  const mediaEntradas = conhecidas.length ? conhecidas.reduce((a, v) => a + v, 0) / conhecidas.length
+    : prevIncomeEntries.reduce((a, e) => a + Number(e.amount), 0);
+  const projecao = base.map(b => {
+    const estimada = !(b.entradas > 0);
+    const entradas = estimada ? mediaEntradas : b.entradas;
+    return { mes: `${b.year}-${String(b.month).padStart(2, '0')}`, entradas: arred(entradas), entradas_estimadas: estimada,
+             comprometido: arred(b.comprometido), folga: arred(entradas - b.comprometido) };
+  });
+  const prox6 = projecao.slice(0, 6);
+  const folgaMedia = prox6.reduce((a, m) => a + m.folga, 0) / prox6.length;
+
+  const faturas = paymentMethods.filter(p => p.type === 'credito' && p.active !== false).map(card => ({
+    cartao: card.name,
+    total_mes: arred(
+      spendingEntries.filter(e => e.payment_method_id === card.id).reduce((a, e) => a + Number(e.amount), 0) +
+      commitments.filter(c => c.default_payment_method_id === card.id && (c.recurrence_type === 'automatico' || (c.recurrence_type === 'pontual' && c.due_day === null)))
+        .reduce((a, c) => a + Number(c.planned_amount), 0))
+  }));
+
+  const ctx = {
+    mes_aberto: `${anoAtual}-${String(mesAtual).padStart(2, '0')}`,
+    hoje: new Date().toLocaleDateString('sv-SE'),
+    entradas_mes: arred(r.totalEntradas), gasto_ate_agora: arred(r.totalGasto),
+    comprometido_projetado_mes: arred(r.totalProjetado),
+    sobra_real: arred(r.sobraReal), sobra_projetada: arred(r.sobraProjetada),
+    folga_media_proximos_6_meses: arred(folgaMedia),
+    categorias: categoriasCtx,
+    contas_a_pagar_pendentes: commitments.filter(c => c.recurrence_type !== 'automatico' && Number(c.remaining) > 0.005)
+      .map(c => ({ conta: c.name, falta: arred(c.remaining), dia: c.due_day })),
+    faturas_cartao: faturas,
+    projecao_meses: projecao
+  };
+  const valor = extrairValor(pergunta);
+  if (valor && /parcel|financ|dividir|vezes|\dx\b/i.test(pergunta)) {
+    ctx.simulacao_parcelamento = {
+      valor_total: arred(valor), parcelas_comecam_em: ctx.mes_aberto,
+      regra: 'confortavel = parcela até 30% da folga média e nenhum mês fica negativo; apertado = nenhum mês negativo; nao_cabe = algum mês fica negativo',
+      opcoes: simularParcelamento(valor, projecao, folgaMedia)
+    };
+  }
+  return ctx;
+}
+
+async function erroDoAssistente(error) {
+  let codigo = '';
+  try { codigo = (await error.context.json()).error || ''; } catch {}
+  const msgs = {
+    not_configured: 'O assistente ainda não foi ativado: falta a chave do Groq no Supabase (Edge Functions → Secrets → GROQ_API_KEY).',
+    daily_limit: 'O limite diário de perguntas foi atingido. Tente amanhã.',
+    provider_rate_limit: 'O Groq pediu uma pausa. Tente de novo em instantes.'
+  };
+  return msgs[codigo] || 'Não consegui falar com o assistente agora. Tente de novo em instantes.';
+}
+
+async function enviarChat(texto) {
+  texto = String(texto || '').trim();
+  if (chatCarregando || !texto) return;
+  if (!dadosOk) { showToast('Carregue os dados do mês antes de perguntar','error'); return; }
+  chatMsgs.push({ role: 'user', content: texto.slice(0, 2000) });
+  chatRascunho = ''; chatCarregando = true; salvarChat(); renderAssistente(true);
+  try {
+    const context = await montarContextoIA(texto);
+    const messages = chatMsgs.filter(m => !m.erro).slice(-10).map(({ role, content }) => ({ role, content }));
+    const { data, error } = await sb.functions.invoke('chat-financeiro', { body: { messages, context } });
+    if (error) throw new Error(await erroDoAssistente(error));
+    if (!data || !data.reply) throw new Error('A resposta veio vazia. Tente reformular a pergunta.');
+    chatMsgs.push({ role: 'assistant', content: data.reply });
+  } catch (e) {
+    chatMsgs.push({ role: 'assistant', erro: true, content: e.message === 'dados' ? 'Não consegui ler seus números agora. Tente de novo.' : (e.message || 'Erro inesperado.') });
+  } finally {
+    chatCarregando = false; salvarChat(); renderAssistente(true);
+  }
+}
+
+function limparChat() {
+  if (chatMsgs.length && !confirm('Limpar a conversa?')) return;
+  chatMsgs = []; chatRascunho = ''; salvarChat(); renderAssistente(false);
+}
+
+function renderAssistente(rolar) {
+  const el = document.getElementById('assistente-root');
+  if (!el) return;
+  const sugestoes = [
+    'Tenho R$ 3.000 para pagar. Em quantas parcelas posso dividir sem apertar o dia a dia?',
+    'Quanto ainda posso gastar com lazer este mês?',
+    'Como está minha folga nos próximos meses?'
+  ];
+  const bolhas = chatMsgs.map(m => `<div class="chat-bubble ${m.role === 'user' ? 'user' : 'bot'}${m.erro ? ' erro' : ''}">${m.role === 'user' ? esc(m.content).replace(/\n/g, '<br>') : mdLite(m.content)}</div>`).join('');
+  const intro = chatMsgs.length ? '' : `
+    <div class="chat-intro">Pergunte sobre decisões com base nos seus números de ${MESES[mesAtual-1]}: parcelar uma conta, quanto dá para gastar numa categoria, como ficam os próximos meses.
+      <div class="chat-chips">${sugestoes.map((q, i) => `<button class="chat-chip" onclick="enviarChat(sugestoesChat[${i}])">${esc(q)}</button>`).join('')}</div>
+    </div>`;
+  window.sugestoesChat = sugestoes;
+  el.innerHTML = `
+    <div class="chat-wrap">
+      <div class="chat-head">
+        <div><div class="chat-title">Assistente</div><div class="chat-sub">Analisa seus números de ${esc(mesLabel(mesAtual, anoAtual))}</div></div>
+        ${chatMsgs.length ? '<button class="chat-clear" onclick="limparChat()">Limpar</button>' : ''}
+      </div>
+      <div class="chat-msgs" id="chat-msgs">
+        ${intro}${bolhas}
+        ${chatCarregando ? '<div class="chat-bubble bot"><div class="chat-typing"><span></span><span></span><span></span></div></div>' : ''}
+      </div>
+      <div class="chat-compose">
+        <textarea id="chat-input" rows="1" placeholder="Pergunte algo sobre suas finanças…" ${chatCarregando ? 'disabled' : ''}
+          oninput="chatRascunho=this.value;this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarChat(this.value)}">${esc(chatRascunho)}</textarea>
+        <button class="chat-send" id="chat-send" aria-label="Enviar" ${chatCarregando ? 'disabled' : ''} onclick="enviarChat(document.getElementById('chat-input').value)">↑</button>
+      </div>
+      <div class="chat-priv">Sua pergunta e um resumo dos seus números são enviados ao Groq para gerar a resposta.</div>
+    </div>`;
+  if (rolar) window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
 // === ROUTING ===
 function switchTab(tab) {
   abaAtiva = tab;
@@ -2704,6 +2945,7 @@ function renderAtivo() {
   if (abaAtiva==='pagar')        renderPagar();
   if (abaAtiva==='gastos')       renderGastos();
   if (abaAtiva==='faturas')      renderFaturas();
+  if (abaAtiva==='assistente')   renderAssistente(false);
   if (abaAtiva==='perfil')       renderPerfil();
 }
 
