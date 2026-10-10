@@ -726,6 +726,9 @@ const esc  = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 // Todo lançamento pertence ao mês selecionado no app; a data real de hoje só decide o dia
 // dentro desse mês (e é local, não UTC, para não virar o dia/mês depois das 21h).
+// Contas que entram sozinhas no gasto do mês, sem ninguém "pagar": automáticos (Netflix…) e parcelas de compra no cartão (sem vencimento)
+const cobraSozinha = c => c.recurrence_type === 'automatico' || (c.recurrence_type === 'pontual' && c.due_day == null);
+
 function dataNoMes() {
   const h = new Date();
   const dia = (h.getFullYear() === anoAtual && h.getMonth() + 1 === mesAtual) ? h.getDate() : 1;
@@ -1105,11 +1108,11 @@ function calcMes() {
   // Gasto por categoria ('' = sem categoria). Uma única fonte, sem contar nada duas vezes:
   //  - lançamentos (aba Gastos). Pagar uma conta cria um lançamento ligado ao pagamento,
   //    então ele já está aqui — por isso o valor pago NÃO é somado de novo;
-  //  - automáticos (Netflix, Spotify…): contam pelo planejado, cobram sozinhos.
+  //  - automáticos (Netflix, Spotify…) e parcelas de compra no cartão: contam pelo planejado, cobram sozinhos.
   const gastoPorCat = {};
   const somar = (catId, v) => { const k = catId || ''; gastoPorCat[k] = (gastoPorCat[k] || 0) + v; };
   spendingEntries.forEach(e => somar(e.category_id, Number(e.amount)));
-  commitments.filter(c => c.recurrence_type === 'automatico')
+  commitments.filter(cobraSozinha)
     .forEach(c => somar(c.category_id, Number(c.planned_amount)));
   const totalGasto = Object.values(gastoPorCat).reduce((s, v) => s + v, 0);
 
@@ -2055,7 +2058,12 @@ function renderGastos() {
                onblur="setTimeout(fecharSubcatDropdown,150)" />
         <div id="subcat-dropdown" class="subcat-dropdown" style="display:none"></div>
       </div>
-      <div class="field"><label>Método</label><select id="g-pm">${pmOpts}</select></div>
+      <div class="field-row">
+        <div class="field"><label>Data</label>
+          <input type="date" id="g-data" value="${dataNoMes()}" min="${anoAtual}-${String(mesAtual).padStart(2,'0')}-01" max="${anoAtual}-${String(mesAtual).padStart(2,'0')}-${String(new Date(anoAtual, mesAtual, 0).getDate()).padStart(2,'0')}" />
+        </div>
+        <div class="field"><label>Método</label><select id="g-pm">${pmOpts}</select></div>
+      </div>
       <div class="field" style="margin-bottom:4px">
         <label>Observação (opcional)</label>
         <input type="text" id="g-desc" placeholder="Detalhes adicionais..." />
@@ -2106,6 +2114,12 @@ function renderGastos() {
   setTimeout(atualizarSubcatList, 0);
 }
 
+// Data do campo, sempre dentro do mês aberto (qualquer outra vira o dia padrão do mês)
+function dataEscolhida() {
+  const v = document.getElementById('g-data')?.value || '';
+  return v.startsWith(`${anoAtual}-${String(mesAtual).padStart(2,'0')}-`) ? v : dataNoMes();
+}
+
 let _salvandoGasto = false;
 function limparFormGasto() {
   ['g-valor','g-subcat','g-desc'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
@@ -2131,7 +2145,7 @@ async function addGasto() {
     // Sempre cai no mês aberto no app
     const { data: row, error } = await sb.from('fin_spending_entries').insert({
       month:mesAtual, year:anoAtual, category_id:catId, payment_method_id:pmId,
-      amount:valor, description:desc||null, spend_date:dataNoMes(), subcategory:subcat||null
+      amount:valor, description:desc||null, spend_date:dataEscolhida(), subcategory:subcat||null
     }).select().single();
     if (error) throw error;
     spendingEntries.unshift(row);
@@ -2588,7 +2602,7 @@ function abrirCatDrilldown(catId) {
   const catName = cat ? cat.name : 'Sem categoria';
   const daCat   = c => (c.category_id || '') === (catId || '');
   // Mesmas regras do Dashboard, para o total bater com o card que foi tocado.
-  const catCommitments = commitments.filter(c => daCat(c) && c.recurrence_type === 'automatico');
+  const catCommitments = commitments.filter(c => daCat(c) && cobraSozinha(c));
   const catEntries = spendingEntries.filter(e => daCat({ category_id: e.category_id }))
     .sort((a,b) => (b.spend_date||'').localeCompare(a.spend_date||''));
   const totalAuto   = catCommitments.reduce((s,c) => s + Number(c.planned_amount), 0);
@@ -2812,7 +2826,7 @@ async function montarContextoIA(pergunta, anterior) {
     sobra_real: arred(r.sobraReal), sobra_projetada: arred(r.sobraProjetada),
     folga_media_proximos_6_meses: arred(folgaMedia),
     categorias: categoriasCtx,
-    contas_a_pagar_pendentes: commitments.filter(c => c.recurrence_type !== 'automatico' && faltaConta(c) > 0.005)
+    contas_a_pagar_pendentes: commitments.filter(c => !cobraSozinha(c) && faltaConta(c) > 0.005)
       .map(c => ({ conta: c.name, falta: arred(faltaConta(c)), dia: c.due_day })),
     faturas_cartao: faturas,
     projecao_meses: projecao
