@@ -3,7 +3,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = Deno.env.get("GROQ_MODEL") ?? "llama-3.3-70b-versatile";
+// llama-3.3-70b-versatile foi descontinuado pelo Groq (16/08/2026); o substituto indicado é o gpt-oss-120b.
+const MODEL = Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-120b";
 const LIMITE_DIARIO = Number(Deno.env.get("AI_DAILY_LIMIT") ?? "200");
 const MAX_MSGS = 12;
 const MAX_CHARS_MSG = 2000;
@@ -25,6 +26,8 @@ Regras:
 - "folga" = entradas do mês menos o comprometido do mês. É o que sobra para gastos novos sem apertar o dia a dia.
 - Para parcelamento: se o contexto trouxer "simulacao_parcelamento", escolha entre as opções dele e recomende a mais curta que esteja "confortavel"; se nenhuma for, diga a mais curta "apertada" e o risco. Considere também os compromissos dos meses seguintes (campo "projecao_meses").
 - Para "quanto posso gastar em X": use o campo "categorias": "previsto" é o orçamento do mês da categoria (o que foi planejado), "gasto" o que já saiu e "resta" o que ainda cabe (previsto menos gasto; negativo = passou). Diferencie o que resta na categoria do que cabe na folga geral.
+- Para "quanto gastei em X" (padaria, ifood, uber, lazer…): use o campo "busca". Cada item tem o "termo", o "total_12_meses", o "no_mes_aberto", o "por_mes" e a lista de "lancamentos" reais. Esses totais JÁ foram somados pelo app: responda com eles (cite o mês aberto, o total e, se ajudar, os meses) e nunca diga que não tem a informação quando "encontrados" for maior que zero. Se "encontrados" for 0, diga que não achou lançamento com esse nome nos últimos 12 meses e sugira conferir o nome.
+- "lancamentos_mes" lista todos os lançamentos do mês aberto: "item" é a subcategoria ou descrição (ex.: "Padaria"), "categoria" é o grupo (ex.: "Alimentação"). Use para detalhar (maior gasto, datas, quantos lançamentos).
 - Valores em R$ no formato brasileiro (R$ 1.234,56). Se "entradas_estimadas" for true em um mês, avise que a entrada é estimada.
 - Seja honesto sobre incerteza; isto não é consultoria financeira regulada. Sem sermão: dê a recomendação e o porquê em poucas linhas.`;
 
@@ -68,7 +71,10 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       model: MODEL,
       temperature: 0.2,
-      max_tokens: 900,
+      // gpt-oss é um modelo de raciocínio: o raciocínio gasta tokens da mesma cota, então o teto é maior
+      // e o esforço é baixo (as contas já vêm prontas do app).
+      reasoning_effort: "low",
+      max_completion_tokens: 2000,
       messages: [
         { role: "system", content: SYSTEM },
         { role: "system", content: `CONTEXTO (JSON):\n${contexto}` },
@@ -78,8 +84,11 @@ Deno.serve(async (req) => {
   });
 
   if (!resp.ok) {
+    // Devolve o código e a mensagem do Groq (nunca a chave) para facilitar o diagnóstico
+    let detalhe = "";
+    try { detalhe = String((await resp.json())?.error?.message ?? "").slice(0, 200); } catch { /* corpo não-JSON */ }
     const status = resp.status === 429 ? 429 : 502;
-    return json({ error: resp.status === 429 ? "provider_rate_limit" : "provider_error" }, status);
+    return json({ error: resp.status === 429 ? "provider_rate_limit" : "provider_error", provider_status: resp.status, detalhe }, status);
   }
   const data = await resp.json();
   const reply = data?.choices?.[0]?.message?.content?.trim();

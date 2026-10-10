@@ -2694,6 +2694,23 @@ function simularParcelamento(valor, folgas, folgaMedia) {
   });
 }
 
+// Texto sem acento e minúsculo, para comparar "Padaria" com "padaria", "Alimentação" com "alimentacao"
+const normTxt = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+const PALAVRAS_COMUNS = new Set(('quanto quantos quanta quantas gastei gasto gastos gastar gastou gastamos gastaram posso tenho esse essa esses essas este esta estes estas '
+  + 'desse dessa neste nesta nesse nessa mes meses fazer qual quais como para minha meu minhas meus sobre ainda ultimo ultimos ultima ultimas total valor valores reais '
+  + 'comigo vezes parcela parcelas parcelar dividir pagar pago paga conta contas estou estamos foram onde quando dentro mais menos entre durante mensal semana hoje ontem '
+  + 'categoria categorias lancamento lancamentos preciso devo deveria quero queria saber mostre mostra listar lista todos todas tudo cada quais com por uma uns umas '
+  + 'janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro ano anos mesmo muito pouco vale valem depois antes deste aqui').split(' '));
+
+// Termos da pergunta que podem ser nome de lançamento/subcategoria ("padaria", "ifood", "lazer")
+function termosDaPergunta(q) {
+  const termos = normTxt(q).split(/[^a-z0-9]+/)
+    .filter(w => w.length >= 4 && !PALAVRAS_COMUNS.has(w) && !/^\d+$/.test(w))
+    .map(w => w.replace(/s$/, ''));
+  return [...new Set(termos)].filter(w => w.length >= 3 && !PALAVRAS_COMUNS.has(w));
+}
+
 async function montarContextoIA(pergunta) {
   const r = calcMes();
 
@@ -2703,11 +2720,12 @@ async function montarContextoIA(pergunta) {
   }));
 
   // Próximos 12 meses a partir do mês aberto
-  const [cm, inc] = await Promise.all([
+  const [cm, inc, ent] = await Promise.all([
     sb.from('fin_commitments').select('month, year, planned_amount').gte('year', anoAtual).lte('year', anoAtual + 1),
-    sb.from('fin_income_entries').select('month, year, amount').gte('year', anoAtual).lte('year', anoAtual + 1)
+    sb.from('fin_income_entries').select('month, year, amount').gte('year', anoAtual).lte('year', anoAtual + 1),
+    sb.from('fin_spending_entries').select('month, year, amount, description, subcategory, category_id, spend_date').gte('year', anoAtual - 1).lte('year', anoAtual)
   ]);
-  if (cm.error || inc.error) throw new Error('dados');
+  if (cm.error || inc.error || ent.error) throw new Error('dados');
   const somaMes = (rows, campo, m, y) => (rows || []).filter(x => x.month === m && x.year === y).reduce((a, x) => a + Number(x[campo]), 0);
   const base = [];
   for (let i = 0; i < 12; i++) {
@@ -2751,6 +2769,38 @@ async function montarContextoIA(pergunta) {
     faturas_cartao: faturas,
     projecao_meses: projecao
   };
+
+  // Lançamentos dos últimos 12 meses (a subcategoria — "Padaria", "Uber" — é o item principal)
+  const idxMes = (m, y) => y * 12 + m;
+  const ini = addMeses(mesAtual, anoAtual, -11);
+  const i0 = idxMes(ini.month, ini.year), i1 = idxMes(mesAtual, anoAtual);
+  const catNome = id => (categories.find(c => c.id === id) || {}).name || 'Sem categoria';
+  const lanc = (ent.data || []).filter(e => { const i = idxMes(e.month, e.year); return i >= i0 && i <= i1; }).map(e => ({
+    data: e.spend_date, mes: `${e.year}-${String(e.month).padStart(2, '0')}`,
+    item: e.subcategory || e.description || catNome(e.category_id),
+    obs: e.subcategory && e.description ? e.description : null,
+    categoria: catNome(e.category_id), valor: arred(e.amount)
+  })).sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  const semNulo = l => { const o = { data: l.data, item: l.item, categoria: l.categoria, valor: l.valor }; if (l.obs) o.obs = l.obs; return o; };
+  ctx.lancamentos_mes = lanc.filter(l => l.mes === ctx.mes_aberto).slice(0, 150).map(semNulo);
+
+  // Busca pelos termos da pergunta: o app soma, a IA só lê o resultado
+  const termos = termosDaPergunta(pergunta);
+  if (termos.length) {
+    ctx.busca = termos.map(t => {
+      const achados = lanc.filter(l => normTxt(`${l.item} ${l.obs || ''} ${l.categoria}`).includes(t));
+      const porMes = {};
+      achados.forEach(l => { porMes[l.mes] = arred((porMes[l.mes] || 0) + l.valor); });
+      return {
+        termo: t, encontrados: achados.length,
+        total_12_meses: arred(achados.reduce((a, l) => a + l.valor, 0)),
+        no_mes_aberto: arred(porMes[ctx.mes_aberto] || 0),
+        por_mes: porMes,
+        lancamentos: achados.slice(0, 40).map(semNulo)
+      };
+    });
+  }
+
   const valor = extrairValor(pergunta);
   if (valor && /parcel|financ|dividir|vezes|\dx\b/i.test(pergunta)) {
     ctx.simulacao_parcelamento = {
