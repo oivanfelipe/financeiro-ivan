@@ -600,6 +600,13 @@
     .chat-compose textarea:focus { border-color: var(--accent); }
     .chat-send { width: 44px; height: 44px; flex-shrink: 0; border: none; border-radius: 50%; background: var(--accent); color: #fff; font-size: 20px; cursor: pointer; }
     .chat-send:disabled { opacity: .45; cursor: default; }
+    .chat-mem { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; font-size: 12px; color: var(--text-2); }
+    .chat-mem summary { cursor: pointer; padding: 8px 12px; list-style: none; }
+    .chat-mem summary::-webkit-details-marker { display: none; }
+    .chat-mem-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); }
+    .chat-mem-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .chat-mem-item button, .chat-mem-all { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 12px; padding: 2px 6px; }
+    .chat-mem-all { display: block; width: 100%; text-align: right; padding: 6px 12px; border-top: 1px solid var(--border); }
     .chat-priv { font-size: 10px; color: var(--text-3); text-align: center; padding: 4px 0 0; }
   </style>
 </head>
@@ -2643,6 +2650,8 @@ const CHAT_KEY = 'chat_ia_hist';
 let chatMsgs = [];
 let chatCarregando = false;
 let chatRascunho = '';
+let memoriaIA = [];            // o que o assistente aprendeu (vem do servidor)
+let memoriaCarregada = false;
 try {
   const salvo = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
   if (Array.isArray(salvo)) chatMsgs = salvo.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-30);
@@ -2720,6 +2729,34 @@ function termosDaPergunta(q) {
     .filter(w => w.length >= 4 && !PALAVRAS_COMUNS.has(w) && !/^\d+$/.test(w))
     .map(w => w.replace(/s$/, ''));
   return [...new Set(termos)].filter(w => w.length >= 3 && !PALAVRAS_COMUNS.has(w));
+}
+
+// Memória do assistente: sinônimos, preferências e fatos aprendidos nas conversas (guardados no Supabase)
+async function carregarMemoria(avisarNovos) {
+  try {
+    const { data, error } = await sb.functions.invoke('chat-financeiro', { body: { acao: 'memoria_listar' } });
+    if (error || !data || !Array.isArray(data.memoria)) return;
+    const antes = new Set(memoriaIA.map(m => m.id));
+    const novos = memoriaCarregada ? data.memoria.filter(m => !antes.has(m.id)) : [];
+    memoriaIA = data.memoria; memoriaCarregada = true;
+    if (avisarNovos && novos.length) showToast('Aprendi: ' + novos.map(textoMemoria).join(' · '), 'success');
+    if (abaAtiva === 'assistente' && !chatCarregando) renderAssistente(false);
+  } catch {}
+}
+function textoMemoria(m) {
+  return m.tipo === 'sinonimo' ? `${m.chave} = ${m.valor}` : (m.valor ? `${m.chave}: ${m.valor}` : m.chave);
+}
+async function esquecerMemoria(id) {
+  const body = id === 'todos' ? { acao: 'memoria_apagar', todos: true } : { acao: 'memoria_apagar', id };
+  if (id === 'todos' && !confirm('Esquecer tudo o que o assistente aprendeu?')) return;
+  const { error } = await sb.functions.invoke('chat-financeiro', { body });
+  if (error) { showToast('Não consegui esquecer agora','error'); return; }
+  memoriaIA = id === 'todos' ? [] : memoriaIA.filter(m => m.id !== id);
+  renderAssistente(false);
+}
+// Sinônimos aprendidos: "gasolina" → "Combustível" entra na busca igual aos sinônimos fixos
+function sinonimosAprendidos(termo) {
+  return memoriaIA.filter(m => m.tipo === 'sinonimo' && normTxt(m.chave).replace(/s$/, '') === termo).map(m => normTxt(m.valor));
 }
 
 async function montarContextoIA(pergunta, anterior) {
@@ -2805,7 +2842,7 @@ async function montarContextoIA(pergunta, anterior) {
   const consultas = [];
   termos.forEach(t => {
     consultas.push({ termo: t });
-    (SINONIMOS[t] || []).forEach(sn => consultas.push({ termo: sn, sinonimo_de: t }));
+    [...(SINONIMOS[t] || []), ...sinonimosAprendidos(t)].forEach(sn => consultas.push({ termo: sn, sinonimo_de: t }));
   });
   const vistos = new Set();
   const busca = consultas.filter(c => !vistos.has(c.termo) && vistos.add(c.termo)).map(c => {
@@ -2864,6 +2901,7 @@ async function enviarChat(texto) {
     if (error) throw new Error(await erroDoAssistente(error));
     if (!data || !data.reply) throw new Error('A resposta veio vazia. Tente reformular a pergunta.');
     chatMsgs.push({ role: 'assistant', content: data.reply });
+    setTimeout(() => carregarMemoria(true), 6000);   // o servidor aprende em segundo plano
   } catch (e) {
     chatMsgs.push({ role: 'assistant', erro: true, content: e.message === 'dados' ? 'Não consegui ler seus números agora. Tente de novo.' : (e.message || 'Erro inesperado.') });
   } finally {
@@ -2889,13 +2927,21 @@ function renderAssistente(rolar) {
     <div class="chat-intro">Pergunte sobre decisões com base nos seus números de ${MESES[mesAtual-1]}: parcelar uma conta, quanto dá para gastar numa categoria, como ficam os próximos meses.
       <div class="chat-chips">${sugestoes.map((q, i) => `<button class="chat-chip" onclick="enviarChat(sugestoesChat[${i}])">${esc(q)}</button>`).join('')}</div>
     </div>`;
+  const memHtml = memoriaIA.length ? `
+      <details class="chat-mem">
+        <summary>🧠 O que aprendi (${memoriaIA.length})</summary>
+        ${memoriaIA.map(m => `<div class="chat-mem-item"><span>${esc(textoMemoria(m))}</span><button aria-label="Esquecer" onclick="esquecerMemoria('${esc(m.id)}')">✕</button></div>`).join('')}
+        <button class="chat-mem-all" onclick="esquecerMemoria('todos')">Esquecer tudo</button>
+      </details>` : '';
   window.sugestoesChat = sugestoes;
+  if (!memoriaCarregada) carregarMemoria(false);
   el.innerHTML = `
     <div class="chat-wrap">
       <div class="chat-head">
         <div><div class="chat-title">Assistente</div><div class="chat-sub">Analisa seus números de ${esc(mesLabel(mesAtual, anoAtual))}</div></div>
         ${chatMsgs.length ? '<button class="chat-clear" onclick="limparChat()">Limpar</button>' : ''}
       </div>
+      ${memHtml}
       <div class="chat-msgs" id="chat-msgs">
         ${intro}${bolhas}
         ${chatCarregando ? '<div class="chat-bubble bot"><div class="chat-typing"><span></span><span></span><span></span></div></div>' : ''}
