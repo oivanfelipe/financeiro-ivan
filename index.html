@@ -2701,7 +2701,18 @@ const PALAVRAS_COMUNS = new Set(('quanto quantos quanta quantas gastei gasto gas
   + 'desse dessa neste nesta nesse nessa mes meses fazer qual quais como para minha meu minhas meus sobre ainda ultimo ultimos ultima ultimas total valor valores reais '
   + 'comigo vezes parcela parcelas parcelar dividir pagar pago paga conta contas estou estamos foram onde quando dentro mais menos entre durante mensal semana hoje ontem '
   + 'categoria categorias lancamento lancamentos preciso devo deveria quero queria saber mostre mostra listar lista todos todas tudo cada quais com por uma uns umas '
-  + 'janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro ano anos mesmo muito pouco vale valem depois antes deste aqui').split(' '));
+  + 'janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro ano anos mesmo muito pouco vale valem depois antes deste aqui '
+  + 'isso isto aquilo sim nao obrigado obrigada valeu pode entao bem certo beleza claro exato tambem disponivel disponiveis sobra sobrou resta restam restante falta faltam '
+  + 'orcamento previsto gastando gastaria gastaram ajuda ajudar analise analisar considerando considerar fazendo feito fiz fica ficou ficar vai vou queremos').split(' '));
+
+// Nomes diferentes para a mesma coisa: quem pergunta "gasolina" pode ter lançado "Combustível"
+const SINONIMOS = {
+  gasolina: ['combustivel', 'posto', 'etanol', 'abastec'], etanol: ['combustivel', 'gasolina', 'posto'], abastecimento: ['combustivel', 'gasolina', 'posto'],
+  combustivel: ['gasolina', 'posto', 'etanol', 'abastec'], posto: ['combustivel', 'gasolina'],
+  mercado: ['supermercado', 'feira', 'hortifruti'], supermercado: ['mercado'], feira: ['mercado', 'hortifruti'],
+  farmacia: ['remedio', 'drogaria'], remedio: ['farmacia', 'drogaria'], drogaria: ['farmacia'],
+  uber: ['taxi', 'transporte', '99'], taxi: ['uber', '99'], estacionamento: ['parking']
+};
 
 // Termos da pergunta que podem ser nome de lançamento/subcategoria ("padaria", "ifood", "lazer")
 function termosDaPergunta(q) {
@@ -2711,7 +2722,7 @@ function termosDaPergunta(q) {
   return [...new Set(termos)].filter(w => w.length >= 3 && !PALAVRAS_COMUNS.has(w));
 }
 
-async function montarContextoIA(pergunta) {
+async function montarContextoIA(pergunta, anterior) {
   const r = calcMes();
 
   const categoriasCtx = linhasCategorias().map(l => ({
@@ -2785,21 +2796,36 @@ async function montarContextoIA(pergunta) {
   ctx.lancamentos_mes = lanc.filter(l => l.mes === ctx.mes_aberto).slice(0, 150).map(semNulo);
 
   // Busca pelos termos da pergunta: o app soma, a IA só lê o resultado
-  const termos = termosDaPergunta(pergunta);
-  if (termos.length) {
-    ctx.busca = termos.map(t => {
-      const achados = lanc.filter(l => normTxt(`${l.item} ${l.obs || ''} ${l.categoria}`).includes(t));
-      const porMes = {};
-      achados.forEach(l => { porMes[l.mes] = arred((porMes[l.mes] || 0) + l.valor); });
-      return {
-        termo: t, encontrados: achados.length,
-        total_12_meses: arred(achados.reduce((a, l) => a + l.valor, 0)),
-        no_mes_aberto: arred(porMes[ctx.mes_aberto] || 0),
-        por_mes: porMes,
-        lancamentos: achados.slice(0, 40).map(semNulo)
-      };
-    });
+  // Resposta curta ("isso", "sim") continua o assunto da pergunta anterior
+  let termos = termosDaPergunta(pergunta);
+  if (anterior && normTxt(pergunta).split(/[^a-z0-9]+/).filter(Boolean).length <= 3) {
+    termos = [...new Set([...termos, ...termosDaPergunta(anterior)])];
   }
+  // Cada termo + seus sinônimos; o sinônimo só entra no resultado se achar algo
+  const consultas = [];
+  termos.forEach(t => {
+    consultas.push({ termo: t });
+    (SINONIMOS[t] || []).forEach(sn => consultas.push({ termo: sn, sinonimo_de: t }));
+  });
+  const vistos = new Set();
+  const busca = consultas.filter(c => !vistos.has(c.termo) && vistos.add(c.termo)).map(c => {
+    const achados = lanc.filter(l => normTxt(`${l.item} ${l.obs || ''} ${l.categoria}`).includes(c.termo));
+    const porMes = {};
+    achados.forEach(l => { porMes[l.mes] = arred((porMes[l.mes] || 0) + l.valor); });
+    const r = { termo: c.termo, encontrados: achados.length,
+      total_12_meses: arred(achados.reduce((a, l) => a + l.valor, 0)),
+      no_mes_aberto: arred(porMes[ctx.mes_aberto] || 0), por_mes: porMes,
+      lancamentos: achados.slice(0, 40).map(semNulo) };
+    if (c.sinonimo_de) r.sinonimo_de = c.sinonimo_de;
+    return r;
+  }).filter(r => r.encontrados > 0 || !r.sinonimo_de);
+  if (busca.length) ctx.busca = busca;
+
+  // Planejamento do mês: previsto, pago e quanto falta de cada item (onde "Combustível" aparece como item)
+  ctx.planejamento_mes = commitments.slice(0, 80).map(c => ({
+    item: c.name, categoria: catNome(c.category_id), tipo: c.recurrence_type,
+    previsto: arred(c.planned_amount), pago: arred(c.paid), falta: arred(faltaConta(c))
+  }));
 
   const valor = extrairValor(pergunta);
   if (valor && /parcel|financ|dividir|vezes|\dx\b/i.test(pergunta)) {
@@ -2830,7 +2856,9 @@ async function enviarChat(texto) {
   chatMsgs.push({ role: 'user', content: texto.slice(0, 2000) });
   chatRascunho = ''; chatCarregando = true; salvarChat(); renderAssistente(true);
   try {
-    const context = await montarContextoIA(texto);
+    const doUsuario = chatMsgs.filter(m => m.role === 'user');
+    const anterior = doUsuario.length > 1 ? doUsuario[doUsuario.length - 2].content : '';
+    const context = await montarContextoIA(texto, anterior);
     const messages = chatMsgs.filter(m => !m.erro).slice(-10).map(({ role, content }) => ({ role, content }));
     const { data, error } = await sb.functions.invoke('chat-financeiro', { body: { messages, context } });
     if (error) throw new Error(await erroDoAssistente(error));
