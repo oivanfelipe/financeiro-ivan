@@ -600,6 +600,13 @@
     .chat-compose textarea:focus { border-color: var(--accent); }
     .chat-send { width: 44px; height: 44px; flex-shrink: 0; border: none; border-radius: 50%; background: var(--accent); color: #fff; font-size: 20px; cursor: pointer; }
     .chat-send:disabled { opacity: .45; cursor: default; }
+    .chat-mem { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; font-size: 12px; color: var(--text-2); }
+    .chat-mem summary { cursor: pointer; padding: 8px 12px; list-style: none; }
+    .chat-mem summary::-webkit-details-marker { display: none; }
+    .chat-mem-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); }
+    .chat-mem-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .chat-mem-item button, .chat-mem-all { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 12px; padding: 2px 6px; }
+    .chat-mem-all { display: block; width: 100%; text-align: right; padding: 6px 12px; border-top: 1px solid var(--border); }
     .chat-priv { font-size: 10px; color: var(--text-3); text-align: center; padding: 4px 0 0; }
   </style>
 </head>
@@ -2643,6 +2650,8 @@ const CHAT_KEY = 'chat_ia_hist';
 let chatMsgs = [];
 let chatCarregando = false;
 let chatRascunho = '';
+let memoriaIA = [];            // o que o assistente aprendeu (vem do servidor)
+let memoriaCarregada = false;
 try {
   const salvo = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
   if (Array.isArray(salvo)) chatMsgs = salvo.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-30);
@@ -2701,7 +2710,18 @@ const PALAVRAS_COMUNS = new Set(('quanto quantos quanta quantas gastei gasto gas
   + 'desse dessa neste nesta nesse nessa mes meses fazer qual quais como para minha meu minhas meus sobre ainda ultimo ultimos ultima ultimas total valor valores reais '
   + 'comigo vezes parcela parcelas parcelar dividir pagar pago paga conta contas estou estamos foram onde quando dentro mais menos entre durante mensal semana hoje ontem '
   + 'categoria categorias lancamento lancamentos preciso devo deveria quero queria saber mostre mostra listar lista todos todas tudo cada quais com por uma uns umas '
-  + 'janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro ano anos mesmo muito pouco vale valem depois antes deste aqui').split(' '));
+  + 'janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro ano anos mesmo muito pouco vale valem depois antes deste aqui '
+  + 'isso isto aquilo sim nao obrigado obrigada valeu pode entao bem certo beleza claro exato tambem disponivel disponiveis sobra sobrou resta restam restante falta faltam '
+  + 'orcamento previsto gastando gastaria gastaram ajuda ajudar analise analisar considerando considerar fazendo feito fiz fica ficou ficar vai vou queremos').split(' '));
+
+// Nomes diferentes para a mesma coisa: quem pergunta "gasolina" pode ter lançado "Combustível"
+const SINONIMOS = {
+  gasolina: ['combustivel', 'posto', 'etanol', 'abastec'], etanol: ['combustivel', 'gasolina', 'posto'], abastecimento: ['combustivel', 'gasolina', 'posto'],
+  combustivel: ['gasolina', 'posto', 'etanol', 'abastec'], posto: ['combustivel', 'gasolina'],
+  mercado: ['supermercado', 'feira', 'hortifruti'], supermercado: ['mercado'], feira: ['mercado', 'hortifruti'],
+  farmacia: ['remedio', 'drogaria'], remedio: ['farmacia', 'drogaria'], drogaria: ['farmacia'],
+  uber: ['taxi', 'transporte', '99'], taxi: ['uber', '99'], estacionamento: ['parking']
+};
 
 // Termos da pergunta que podem ser nome de lançamento/subcategoria ("padaria", "ifood", "lazer")
 function termosDaPergunta(q) {
@@ -2711,7 +2731,35 @@ function termosDaPergunta(q) {
   return [...new Set(termos)].filter(w => w.length >= 3 && !PALAVRAS_COMUNS.has(w));
 }
 
-async function montarContextoIA(pergunta) {
+// Memória do assistente: sinônimos, preferências e fatos aprendidos nas conversas (guardados no Supabase)
+async function carregarMemoria(avisarNovos) {
+  try {
+    const { data, error } = await sb.functions.invoke('chat-financeiro', { body: { acao: 'memoria_listar' } });
+    if (error || !data || !Array.isArray(data.memoria)) return;
+    const antes = new Set(memoriaIA.map(m => m.id));
+    const novos = memoriaCarregada ? data.memoria.filter(m => !antes.has(m.id)) : [];
+    memoriaIA = data.memoria; memoriaCarregada = true;
+    if (avisarNovos && novos.length) showToast('Aprendi: ' + novos.map(textoMemoria).join(' · '), 'success');
+    if (abaAtiva === 'assistente' && !chatCarregando) renderAssistente(false);
+  } catch {}
+}
+function textoMemoria(m) {
+  return m.tipo === 'sinonimo' ? `${m.chave} = ${m.valor}` : (m.valor ? `${m.chave}: ${m.valor}` : m.chave);
+}
+async function esquecerMemoria(id) {
+  const body = id === 'todos' ? { acao: 'memoria_apagar', todos: true } : { acao: 'memoria_apagar', id };
+  if (id === 'todos' && !confirm('Esquecer tudo o que o assistente aprendeu?')) return;
+  const { error } = await sb.functions.invoke('chat-financeiro', { body });
+  if (error) { showToast('Não consegui esquecer agora','error'); return; }
+  memoriaIA = id === 'todos' ? [] : memoriaIA.filter(m => m.id !== id);
+  renderAssistente(false);
+}
+// Sinônimos aprendidos: "gasolina" → "Combustível" entra na busca igual aos sinônimos fixos
+function sinonimosAprendidos(termo) {
+  return memoriaIA.filter(m => m.tipo === 'sinonimo' && normTxt(m.chave).replace(/s$/, '') === termo).map(m => normTxt(m.valor));
+}
+
+async function montarContextoIA(pergunta, anterior) {
   const r = calcMes();
 
   const categoriasCtx = linhasCategorias().map(l => ({
@@ -2785,21 +2833,36 @@ async function montarContextoIA(pergunta) {
   ctx.lancamentos_mes = lanc.filter(l => l.mes === ctx.mes_aberto).slice(0, 150).map(semNulo);
 
   // Busca pelos termos da pergunta: o app soma, a IA só lê o resultado
-  const termos = termosDaPergunta(pergunta);
-  if (termos.length) {
-    ctx.busca = termos.map(t => {
-      const achados = lanc.filter(l => normTxt(`${l.item} ${l.obs || ''} ${l.categoria}`).includes(t));
-      const porMes = {};
-      achados.forEach(l => { porMes[l.mes] = arred((porMes[l.mes] || 0) + l.valor); });
-      return {
-        termo: t, encontrados: achados.length,
-        total_12_meses: arred(achados.reduce((a, l) => a + l.valor, 0)),
-        no_mes_aberto: arred(porMes[ctx.mes_aberto] || 0),
-        por_mes: porMes,
-        lancamentos: achados.slice(0, 40).map(semNulo)
-      };
-    });
+  // Resposta curta ("isso", "sim") continua o assunto da pergunta anterior
+  let termos = termosDaPergunta(pergunta);
+  if (anterior && normTxt(pergunta).split(/[^a-z0-9]+/).filter(Boolean).length <= 3) {
+    termos = [...new Set([...termos, ...termosDaPergunta(anterior)])];
   }
+  // Cada termo + seus sinônimos; o sinônimo só entra no resultado se achar algo
+  const consultas = [];
+  termos.forEach(t => {
+    consultas.push({ termo: t });
+    [...(SINONIMOS[t] || []), ...sinonimosAprendidos(t)].forEach(sn => consultas.push({ termo: sn, sinonimo_de: t }));
+  });
+  const vistos = new Set();
+  const busca = consultas.filter(c => !vistos.has(c.termo) && vistos.add(c.termo)).map(c => {
+    const achados = lanc.filter(l => normTxt(`${l.item} ${l.obs || ''} ${l.categoria}`).includes(c.termo));
+    const porMes = {};
+    achados.forEach(l => { porMes[l.mes] = arred((porMes[l.mes] || 0) + l.valor); });
+    const r = { termo: c.termo, encontrados: achados.length,
+      total_12_meses: arred(achados.reduce((a, l) => a + l.valor, 0)),
+      no_mes_aberto: arred(porMes[ctx.mes_aberto] || 0), por_mes: porMes,
+      lancamentos: achados.slice(0, 40).map(semNulo) };
+    if (c.sinonimo_de) r.sinonimo_de = c.sinonimo_de;
+    return r;
+  }).filter(r => r.encontrados > 0 || !r.sinonimo_de);
+  if (busca.length) ctx.busca = busca;
+
+  // Planejamento do mês: previsto, pago e quanto falta de cada item (onde "Combustível" aparece como item)
+  ctx.planejamento_mes = commitments.slice(0, 80).map(c => ({
+    item: c.name, categoria: catNome(c.category_id), tipo: c.recurrence_type,
+    previsto: arred(c.planned_amount), pago: arred(c.paid), falta: arred(faltaConta(c))
+  }));
 
   const valor = extrairValor(pergunta);
   if (valor && /parcel|financ|dividir|vezes|\dx\b/i.test(pergunta)) {
@@ -2830,12 +2893,15 @@ async function enviarChat(texto) {
   chatMsgs.push({ role: 'user', content: texto.slice(0, 2000) });
   chatRascunho = ''; chatCarregando = true; salvarChat(); renderAssistente(true);
   try {
-    const context = await montarContextoIA(texto);
+    const doUsuario = chatMsgs.filter(m => m.role === 'user');
+    const anterior = doUsuario.length > 1 ? doUsuario[doUsuario.length - 2].content : '';
+    const context = await montarContextoIA(texto, anterior);
     const messages = chatMsgs.filter(m => !m.erro).slice(-10).map(({ role, content }) => ({ role, content }));
     const { data, error } = await sb.functions.invoke('chat-financeiro', { body: { messages, context } });
     if (error) throw new Error(await erroDoAssistente(error));
     if (!data || !data.reply) throw new Error('A resposta veio vazia. Tente reformular a pergunta.');
     chatMsgs.push({ role: 'assistant', content: data.reply });
+    setTimeout(() => carregarMemoria(true), 6000);   // o servidor aprende em segundo plano
   } catch (e) {
     chatMsgs.push({ role: 'assistant', erro: true, content: e.message === 'dados' ? 'Não consegui ler seus números agora. Tente de novo.' : (e.message || 'Erro inesperado.') });
   } finally {
@@ -2861,13 +2927,21 @@ function renderAssistente(rolar) {
     <div class="chat-intro">Pergunte sobre decisões com base nos seus números de ${MESES[mesAtual-1]}: parcelar uma conta, quanto dá para gastar numa categoria, como ficam os próximos meses.
       <div class="chat-chips">${sugestoes.map((q, i) => `<button class="chat-chip" onclick="enviarChat(sugestoesChat[${i}])">${esc(q)}</button>`).join('')}</div>
     </div>`;
+  const memHtml = memoriaIA.length ? `
+      <details class="chat-mem">
+        <summary>🧠 O que aprendi (${memoriaIA.length})</summary>
+        ${memoriaIA.map(m => `<div class="chat-mem-item"><span>${esc(textoMemoria(m))}</span><button aria-label="Esquecer" onclick="esquecerMemoria('${esc(m.id)}')">✕</button></div>`).join('')}
+        <button class="chat-mem-all" onclick="esquecerMemoria('todos')">Esquecer tudo</button>
+      </details>` : '';
   window.sugestoesChat = sugestoes;
+  if (!memoriaCarregada) carregarMemoria(false);
   el.innerHTML = `
     <div class="chat-wrap">
       <div class="chat-head">
         <div><div class="chat-title">Assistente</div><div class="chat-sub">Analisa seus números de ${esc(mesLabel(mesAtual, anoAtual))}</div></div>
         ${chatMsgs.length ? '<button class="chat-clear" onclick="limparChat()">Limpar</button>' : ''}
       </div>
+      ${memHtml}
       <div class="chat-msgs" id="chat-msgs">
         ${intro}${bolhas}
         ${chatCarregando ? '<div class="chat-bubble bot"><div class="chat-typing"><span></span><span></span><span></span></div></div>' : ''}
