@@ -729,6 +729,14 @@ const esc  = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'
 // Contas que entram sozinhas no gasto do mês, sem ninguém "pagar": automáticos (Netflix…) e parcelas de compra no cartão (sem vencimento)
 const cobraSozinha = c => c.recurrence_type === 'automatico' || (c.recurrence_type === 'pontual' && c.due_day == null);
 
+// Parcela que o usuário já digitou também como gasto (mesmo nome e categoria no mês): conta uma vez só, pelo lançamento
+const lancadaAMao = c => {
+  const nome = normTxt(c.name);
+  return spendingEntries.some(e => (e.category_id || '') === (c.category_id || '') && normTxt(e.subcategory || e.description) === nome);
+};
+// Entra sozinha no gasto do mês: automáticos e parcelas de cartão ainda não lançadas à mão
+const gastoSozinho = c => c.recurrence_type === 'automatico' || (cobraSozinha(c) && !lancadaAMao(c));
+
 function dataNoMes() {
   const h = new Date();
   const dia = (h.getFullYear() === anoAtual && h.getMonth() + 1 === mesAtual) ? h.getDate() : 1;
@@ -1112,7 +1120,7 @@ function calcMes() {
   const gastoPorCat = {};
   const somar = (catId, v) => { const k = catId || ''; gastoPorCat[k] = (gastoPorCat[k] || 0) + v; };
   spendingEntries.forEach(e => somar(e.category_id, Number(e.amount)));
-  commitments.filter(cobraSozinha)
+  commitments.filter(gastoSozinho)
     .forEach(c => somar(c.category_id, Number(c.planned_amount)));
   const totalGasto = Object.values(gastoPorCat).reduce((s, v) => s + v, 0);
 
@@ -1921,7 +1929,7 @@ function renderFaturas() {
       .filter(e => e.payment_method_id===card.id)
       .sort((a,b)=>a.spend_date.localeCompare(b.spend_date));
     const autoItems      = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
-    const parceladoItems = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null);
+    const parceladoItems = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null && !lancadaAMao(c));
     const manualTotal    = cardEntries.reduce((s,e) => s+Number(e.amount), 0);
     const autoTotal      = autoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
     const parceladoTotal = parceladoItems.reduce((s,c) => s+Number(c.planned_amount), 0);
@@ -1985,7 +1993,7 @@ function renderFaturas() {
   const totalFaturas = creditCards.reduce((sum, card) => {
     const cardEntries = spendingEntries.filter(e => e.payment_method_id===card.id);
     const autoItems   = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='automatico');
-    const parcelados  = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null);
+    const parcelados  = commitments.filter(c => c.default_payment_method_id===card.id && c.recurrence_type==='pontual' && c.due_day===null && !lancadaAMao(c));
     return sum + cardEntries.reduce((s,e)=>s+Number(e.amount),0) + autoItems.reduce((s,c)=>s+Number(c.planned_amount),0) + parcelados.reduce((s,c)=>s+Number(c.planned_amount),0);
   }, 0);
 
@@ -2602,7 +2610,7 @@ function abrirCatDrilldown(catId) {
   const catName = cat ? cat.name : 'Sem categoria';
   const daCat   = c => (c.category_id || '') === (catId || '');
   // Mesmas regras do Dashboard, para o total bater com o card que foi tocado.
-  const catCommitments = commitments.filter(c => daCat(c) && cobraSozinha(c));
+  const catCommitments = commitments.filter(c => daCat(c) && gastoSozinho(c));
   const catEntries = spendingEntries.filter(e => daCat({ category_id: e.category_id }))
     .sort((a,b) => (b.spend_date||'').localeCompare(a.spend_date||''));
   const totalAuto   = catCommitments.reduce((s,c) => s + Number(c.planned_amount), 0);
@@ -2814,7 +2822,7 @@ async function montarContextoIA(pergunta, anterior) {
     cartao: card.name,
     total_mes: arred(
       spendingEntries.filter(e => e.payment_method_id === card.id).reduce((a, e) => a + Number(e.amount), 0) +
-      commitments.filter(c => c.default_payment_method_id === card.id && (c.recurrence_type === 'automatico' || (c.recurrence_type === 'pontual' && c.due_day === null)))
+      commitments.filter(c => c.default_payment_method_id === card.id && (c.recurrence_type === 'automatico' || (c.recurrence_type === 'pontual' && c.due_day === null && !lancadaAMao(c))))
         .reduce((a, c) => a + Number(c.planned_amount), 0))
   }));
 
