@@ -1274,8 +1274,8 @@ function renderPlanejamento() {
         <div class="plan-right">
           <div class="plan-val">R$ ${fmt(c.planned_amount)}</div>
           <div style="display:flex;gap:4px">
-            <button class="menu-btn" style="position:static" onclick="abrirEditarCommitment('${esc(c.id)}')">${ICO_PENCIL}</button>
-            <button class="menu-btn" style="position:static;color:#f87171" onclick="deletarCommitment('${esc(c.id)}')">${ICO_TRASH}</button>
+            <button class="menu-btn" style="position:static;min-width:44px;min-height:44px" aria-label="Editar" onclick="abrirEditarCommitment('${esc(c.id)}')">${ICO_PENCIL}</button>
+            <button class="menu-btn" style="position:static;min-width:44px;min-height:44px;color:#f87171" aria-label="Excluir" onclick="deletarCommitment('${esc(c.id)}')">${ICO_TRASH}</button>
           </div>
         </div>
       </div>`;
@@ -2009,6 +2009,14 @@ function renderGastos() {
   const catOpts = categories.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
   const pmOpts  = paymentMethods.filter(p => p.active!==false).map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   const totalGasto = spendingEntries.reduce((s,e) => s+Number(e.amount), 0);
+  // Atalhos: as 5 categorias mais lançadas no mês (completa com as primeiras da lista)
+  const usoCat = {};
+  spendingEntries.forEach(e => { if (e.category_id) usoCat[e.category_id] = (usoCat[e.category_id] || 0) + 1; });
+  const catAtalhos = [...categories]
+    .sort((a, b) => (usoCat[b.id] || 0) - (usoCat[a.id] || 0))
+    .slice(0, 5)
+    .map(c => `<button type="button" class="filter-chip" style="min-height:40px" onclick="escolherCatAtalho('${esc(c.id)}')">${esc(c.name)}</button>`)
+    .join('');
   const byDay = {};
   spendingEntries.forEach(e => {
     const d = e.spend_date ? e.spend_date.slice(0,10) : 'sem-data';
@@ -2046,6 +2054,7 @@ function renderGastos() {
 
     <div class="gastos-form">
       <div class="gastos-form-title">Registrar gasto</div>
+      <div class="filter-chips" style="margin-bottom:12px">${catAtalhos}</div>
       <div class="field-row">
         <div class="field"><label>Valor (R$)</label>
           <input type="number" id="g-valor" placeholder="0,00" min="0" step="0.01" inputmode="decimal" oninput="atualizarParcPreview()" />
@@ -2268,6 +2277,14 @@ function fecharSubcatDropdown() {
 document.addEventListener('click', e => {
   if (!e.target.closest('.field')) fecharSubcatDropdown();
 });
+
+function escolherCatAtalho(id) {
+  const sel = document.getElementById('g-cat');
+  if (!sel) return;
+  sel.value = id;
+  atualizarSubcatList();
+  document.getElementById('g-valor')?.focus();
+}
 
 async function deletarGasto(id) {
   const e = spendingEntries.find(x => x.id === id);
