@@ -734,8 +734,6 @@ const lancadaAMao = c => {
   const nome = normTxt(c.name);
   return spendingEntries.some(e => (e.category_id || '') === (c.category_id || '') && normTxt(e.subcategory || e.description) === nome);
 };
-// Entra sozinha no gasto do mês: automáticos e parcelas de cartão ainda não lançadas à mão
-const gastoSozinho = c => c.recurrence_type === 'automatico' || (cobraSozinha(c) && !lancadaAMao(c));
 
 function dataNoMes() {
   const h = new Date();
@@ -1113,15 +1111,12 @@ function calcMes() {
   const totalComprometido = commitments.reduce((s,c) => s + Number(c.planned_amount), 0);
   const totalPago         = commitments.reduce((s,c) => s + Number(c.paid || 0), 0);
 
-  // Gasto por categoria ('' = sem categoria). Uma única fonte, sem contar nada duas vezes:
-  //  - lançamentos (aba Gastos). Pagar uma conta cria um lançamento ligado ao pagamento,
-  //    então ele já está aqui — por isso o valor pago NÃO é somado de novo;
-  //  - automáticos (Netflix, Spotify…) e parcelas de compra no cartão: contam pelo planejado, cobram sozinhos.
+  // Gasto por categoria ('' = sem categoria). Fonte única: os lançamentos da aba Gastos.
+  // Pagar uma conta cria um lançamento ligado ao pagamento, então ele já está aqui.
+  // O Planejamento NUNCA vira gasto: é só o previsto do mês.
   const gastoPorCat = {};
   const somar = (catId, v) => { const k = catId || ''; gastoPorCat[k] = (gastoPorCat[k] || 0) + v; };
   spendingEntries.forEach(e => somar(e.category_id, Number(e.amount)));
-  commitments.filter(gastoSozinho)
-    .forEach(c => somar(c.category_id, Number(c.planned_amount)));
   const totalGasto = Object.values(gastoPorCat).reduce((s, v) => s + v, 0);
 
   // Previsto por categoria = tudo que foi lançado no Planejamento para ela.
@@ -2609,8 +2604,8 @@ function abrirCatDrilldown(catId) {
   const cat     = categories.find(c => c.id === catId);
   const catName = cat ? cat.name : 'Sem categoria';
   const daCat   = c => (c.category_id || '') === (catId || '');
-  // Mesmas regras do Dashboard, para o total bater com o card que foi tocado.
-  const catCommitments = commitments.filter(c => daCat(c) && gastoSozinho(c));
+  // Mesmas regras do Dashboard: só lançamentos contam como gasto.
+  const catCommitments = [];
   const catEntries = spendingEntries.filter(e => daCat({ category_id: e.category_id }))
     .sort((a,b) => (b.spend_date||'').localeCompare(a.spend_date||''));
   const totalAuto   = catCommitments.reduce((s,c) => s + Number(c.planned_amount), 0);
