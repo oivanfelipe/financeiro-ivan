@@ -305,6 +305,9 @@
     .rec-opt.sel-manual .rec-opt-label { color: var(--amber); }
     .rec-opt.sel-pontual { border-color: var(--accent); background: var(--accent-soft); }
     .rec-opt.sel-pontual .rec-opt-label { color: var(--accent); }
+    .rec-opt.sel-verba { border-color: var(--green); background: var(--green-bg); }
+    .rec-opt.sel-verba .rec-opt-label { color: var(--green); }
+    .badge-verba { background: var(--green-bg); color: var(--green); }
 
     /* ── PLANEJAMENTO ── */
     .plan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
@@ -735,6 +738,11 @@ const lancadaAMao = c => {
   return spendingEntries.some(e => (e.category_id || '') === (c.category_id || '') && normTxt(e.subcategory || e.description) === nome);
 };
 
+// Verba: quanto já foi gasto nela = lançamentos da mesma categoria cuja subcategoria tem o nome da verba
+const gastoDaVerba = c => spendingEntries
+  .filter(e => (e.category_id || '') === (c.category_id || '') && normTxt(e.subcategory || e.description) === normTxt(c.name))
+  .reduce((s, e) => s + Number(e.amount), 0);
+
 function dataNoMes() {
   const h = new Date();
   const dia = (h.getFullYear() === anoAtual && h.getMonth() + 1 === mesAtual) ? h.getDate() : 1;
@@ -876,6 +884,7 @@ function catAvatar(cat, size='') {
 
 const ICO_REC_AUTO = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
 const ICO_REC_BELL = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
+const ICO_REC_VERBA = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M15 9.5c-.6-.8-1.6-1.2-3-1.2-1.7 0-2.8.8-2.8 2s1 1.7 2.8 2 2.8.8 2.8 2-1.1 2-2.8 2c-1.4 0-2.4-.4-3-1.2"/></svg>`;
 const ICO_REC_CAL  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
 
 function toggleTheme() {
@@ -1254,6 +1263,7 @@ function renderPlanejamento() {
   const automaticas = commitments.filter(c => c.recurrence_type === 'automatico').sort((a,b) => (a.due_day||99)-(b.due_day||99));
   const manuais     = commitments.filter(c => c.recurrence_type === 'manual').sort((a,b) => (a.due_day||99)-(b.due_day||99));
   const pontuais    = commitments.filter(c => c.recurrence_type === 'pontual').sort((a,b) => (a.due_day||99)-(b.due_day||99));
+  const verbas      = commitments.filter(c => c.recurrence_type === 'verba');
 
   function buildPlanCard(c) {
     const cat   = categories.find(x => x.id === c.category_id);
@@ -1263,6 +1273,28 @@ function renderPlanejamento() {
         ? `<span class="badge badge-futuro">Pontual</span>`
         : `<span class="badge badge-manual">Manual</span>`;
     const dayLabel = c.due_day ? `Dia ${c.due_day}` : 'Sem vencimento';
+    if (c.recurrence_type === 'verba') {
+      const limite = Number(c.planned_amount), gasto = gastoDaVerba(c), resta = limite - gasto;
+      const pct = limite > 0 ? Math.min(gasto / limite * 100, 100) : 0;
+      const barClass = gasto > limite ? 'red' : gasto >= limite * 0.8 ? 'amber' : '';
+      return `
+      <div class="plan-card" style="flex-wrap:wrap">
+        ${catAvatar(cat)}
+        <div class="plan-info">
+          <div class="plan-name">${esc(c.name)}</div>
+          <div class="plan-meta">${esc(c.category_name||'')}${c.category_name?' · ':''}Gasto R$ ${fmt(gasto)} de R$ ${fmt(limite)}</div>
+          <span class="badge badge-verba">Verba</span>
+        </div>
+        <div class="plan-right">
+          <div class="plan-val ${resta < 0 ? 'red' : ''}">${resta < 0 ? 'Passou R$ ' + fmt(-resta) : 'Resta R$ ' + fmt(resta)}</div>
+          <div style="display:flex;gap:4px">
+            <button class="menu-btn" style="position:static;min-width:44px;min-height:44px" aria-label="Editar" onclick="abrirEditarCommitment('${esc(c.id)}')">${ICO_PENCIL}</button>
+            <button class="menu-btn" style="position:static;min-width:44px;min-height:44px;color:#f87171" aria-label="Excluir" onclick="deletarCommitment('${esc(c.id)}')">${ICO_TRASH}</button>
+          </div>
+        </div>
+        <div class="progress-bar" style="flex-basis:100%;margin-top:10px"><div class="progress-fill ${barClass}" style="width:${pct}%"></div></div>
+      </div>`;
+    }
     return `
       <div class="plan-card">
         ${catAvatar(cat)}
@@ -1284,6 +1316,7 @@ function renderPlanejamento() {
   const autoHtml    = automaticas.map(buildPlanCard).join('');
   const manualHtml  = manuais.map(buildPlanCard).join('');
   const pontualHtml = pontuais.map(buildPlanCard).join('');
+  const verbaHtml   = verbas.map(buildPlanCard).join('');
 
   const proxM = mesAtual === 12 ? 1 : mesAtual + 1;
   const proxA = mesAtual === 12 ? anoAtual + 1 : anoAtual;
@@ -1353,6 +1386,7 @@ function renderPlanejamento() {
 
     ${automaticas.length ? `<div class="secao-divider">Automáticos — cobram sozinhos</div>${autoHtml}` : ''}
     ${manuais.length     ? `<div class="secao-divider">Manuais — precisa pagar</div>${manualHtml}` : ''}
+    ${verbas.length      ? `<div class="secao-divider">Verbas — vai gastando no mês</div>${verbaHtml}` : ''}
     ${pontuais.length    ? `<div class="secao-divider">Pontuais — só este mês</div>${pontualHtml}` : ''}
 
     ${!commitments.length ? '<div class="empty-state">Nenhuma despesa cadastrada<br><small style="margin-top:8px;display:block">Toque em + Nova para começar</small></div>' : ''}
@@ -1594,7 +1628,7 @@ function abrirEditarCommitment(id) {
     </div>
     <div class="field-row">
       <div class="field"><label>Valor (R$)</label><input type="number" id="edit-valor" value="${Number(c.planned_amount).toFixed(2)}" step="0.01" /></div>
-      <div class="field"><label>Dia vencimento</label><input type="number" id="edit-dia" value="${c.due_day||''}" min="1" max="31" /></div>
+      <div class="field" id="edit-dia-field" style="${recType==='verba'?'display:none':''}"><label>Dia vencimento</label><input type="number" id="edit-dia" value="${c.due_day||''}" min="1" max="31" /></div>
     </div>
     <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
     <div class="rec-toggle">
@@ -1606,6 +1640,9 @@ function abrirEditarCommitment(id) {
       </div>
       <div class="rec-opt ${recType==='pontual'?'sel-pontual':''}" id="edit-rec-pontual" onclick="selecionarRec('edit','pontual')">
         <span class="rec-opt-icon">${ICO_REC_CAL}</span><span class="rec-opt-label">Pontual</span><span class="rec-opt-hint">só este mês</span>
+      </div>
+      <div class="rec-opt ${recType==='verba'?'sel-verba':''}" id="edit-rec-verba" onclick="selecionarRec('edit','verba')">
+        <span class="rec-opt-icon">${ICO_REC_VERBA}</span><span class="rec-opt-label">Verba</span><span class="rec-opt-hint">vai gastando</span>
       </div>
     </div>
     <input type="hidden" id="edit-recurrence" value="${esc(recType)}" />
@@ -1623,7 +1660,7 @@ function abrirEditarCommitment(id) {
             style="width:55px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text-1);font-size:14px;text-align:center" />
           meses
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
+        <label id="edit-parcelar-opt" style="display:${recType==='verba'?'none':'flex'};align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
           <input type="radio" name="edit-rep" value="parcelar" onchange="onEditRepChange()" style="accent-color:var(--accent);width:16px;height:16px" />
           Em mais
           <input type="number" id="edit-parcelas" min="1" max="60" value="6" disabled
@@ -1632,7 +1669,7 @@ function abrirEditarCommitment(id) {
         </label>
       </div>
     </div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+    <div id="edit-card-box" style="${recType==='verba'?'display:none;':''}background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer">
         <input type="checkbox" id="edit-auto-toggle" onchange="toggleAutoCardEdit()" ${autoOn?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)" />
         Cobrado direto no cartão de crédito
@@ -1663,9 +1700,10 @@ async function salvarEdicao() {
   const nome           = document.getElementById('edit-nome').value.trim();
   const catId          = document.getElementById('edit-cat').value || null;
   const valor          = parseFloat(document.getElementById('edit-valor').value);
-  const dia            = parseInt(document.getElementById('edit-dia').value) || null;
   const recurrenceType = document.getElementById('edit-recurrence')?.value || 'manual';
-  const autoOn         = document.getElementById('edit-auto-toggle')?.checked;
+  const ehVerba        = recurrenceType === 'verba';
+  const dia            = ehVerba ? null : (parseInt(document.getElementById('edit-dia').value) || null);
+  const autoOn         = !ehVerba && document.getElementById('edit-auto-toggle')?.checked;
   const defPmId        = autoOn ? (document.getElementById('edit-card')?.value || null) : null;
   // parcelado/fatura têm tratamento próprio no app: editar não pode transformá-los em fixo
   const tipo           = (atual && (atual.type === 'parcelado' || atual.type === 'fatura'))
@@ -1731,7 +1769,7 @@ function abrirModalNovaConta() {
     </div>
     <div class="field-row">
       <div class="field"><label>Valor (R$)</label><input type="number" id="nc-valor" step="0.01" placeholder="0,00" /></div>
-      <div class="field"><label>Dia vencimento</label><input type="number" id="nc-dia" min="1" max="31" placeholder="Ex: 10" /></div>
+      <div class="field" id="nc-dia-field"><label>Dia vencimento</label><input type="number" id="nc-dia" min="1" max="31" placeholder="Ex: 10" /></div>
     </div>
     <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Como é cobrada?</div>
     <div class="rec-toggle">
@@ -1750,6 +1788,11 @@ function abrirModalNovaConta() {
         <span class="rec-opt-label">Pontual</span>
         <span class="rec-opt-hint">só este mês</span>
       </div>
+      <div class="rec-opt" id="nc-rec-verba" onclick="selecionarRec('nc','verba')">
+        <span class="rec-opt-icon">${ICO_REC_VERBA}</span>
+        <span class="rec-opt-label">Verba</span>
+        <span class="rec-opt-hint">vai gastando</span>
+      </div>
     </div>
     <input type="hidden" id="nc-recurrence" value="automatico" />
     <div id="nc-repeat-section" style="margin-bottom:12px">
@@ -1766,7 +1809,7 @@ function abrirModalNovaConta() {
             style="width:55px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text-1);font-size:14px;text-align:center" />
           meses
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
+        <label id="nc-parcelar-opt" style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer;flex-wrap:wrap">
           <input type="radio" name="nc-rep" value="parcelar" onchange="onRepChange()" style="accent-color:var(--accent);width:16px;height:16px" />
           Em
           <input type="number" id="nc-parcelas" min="2" max="60" value="12" disabled
@@ -1775,7 +1818,7 @@ function abrirModalNovaConta() {
         </label>
       </div>
     </div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+    <div id="nc-card-box" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-1);cursor:pointer">
         <input type="checkbox" id="nc-auto-toggle" onchange="toggleAutoCard()" style="width:18px;height:18px;accent-color:var(--accent)" />
         Cobrado direto no cartão de crédito
@@ -1795,7 +1838,7 @@ function abrirModalNovaConta() {
 }
 
 function selecionarRec(prefix, tipo) {
-  const opts = { automatico: 'auto', manual: 'manual', pontual: 'pontual' };
+  const opts = { automatico: 'auto', manual: 'manual', pontual: 'pontual', verba: 'verba' };
   Object.keys(opts).forEach(t => {
     const el = document.getElementById(`${prefix}-rec-${opts[t]}`);
     if (!el) return;
@@ -1803,13 +1846,24 @@ function selecionarRec(prefix, tipo) {
   });
   const hidden = document.getElementById(`${prefix}-recurrence`);
   if (hidden) hidden.value = tipo;
-  if (prefix === 'nc') {
-    const rep = document.getElementById('nc-repeat-section');
-    if (rep) rep.style.display = tipo === 'pontual' ? 'none' : 'block';
-  }
-  if (prefix === 'edit') {
-    const rep = document.getElementById('edit-repeat-section');
-    if (rep) rep.style.display = tipo === 'pontual' ? 'none' : 'block';
+  const rep = document.getElementById(`${prefix}-repeat-section`);
+  if (rep) rep.style.display = tipo === 'pontual' ? 'none' : 'block';
+  aplicarCamposVerba(prefix, tipo === 'verba');
+}
+
+// Verba não tem vencimento, cartão nem parcelas: esconde o que não se aplica
+function aplicarCamposVerba(prefix, ehVerba) {
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show(`${prefix}-dia-field`, !ehVerba);
+  show(`${prefix}-card-box`, !ehVerba);
+  show(`${prefix}-parcelar-opt`, !ehVerba);
+  if (ehVerba) {
+    const r = document.querySelector(`input[name="${prefix}-rep"][value="parcelar"]`);
+    if (r?.checked) {
+      const u = document.querySelector(`input[name="${prefix}-rep"][value="unico"]`);
+      if (u) u.checked = true;
+      (prefix === 'nc' ? onRepChange : onEditRepChange)();
+    }
   }
 }
 
@@ -1839,9 +1893,10 @@ async function salvarNovaConta() {
   const nome           = document.getElementById('nc-nome').value.trim();
   const catId          = document.getElementById('nc-cat').value || null;
   const valor          = parseFloat(document.getElementById('nc-valor').value);
-  const dia            = parseInt(document.getElementById('nc-dia').value) || null;
   const recurrenceType = document.getElementById('nc-recurrence')?.value || 'manual';
-  const autoOn         = document.getElementById('nc-auto-toggle')?.checked;
+  const ehVerba        = recurrenceType === 'verba';
+  const dia            = ehVerba ? null : (parseInt(document.getElementById('nc-dia').value) || null);
+  const autoOn         = !ehVerba && document.getElementById('nc-auto-toggle')?.checked;
   const defPmId        = autoOn ? (document.getElementById('nc-card')?.value || null) : null;
   const repMode        = document.querySelector('input[name="nc-rep"]:checked')?.value || 'unico';
   const nMeses         = Math.max(2, parseInt(document.getElementById('nc-meses')?.value) || 12);
@@ -2066,9 +2121,10 @@ function renderGastos() {
       <div class="field" style="position:relative">
         <label>Subcategoria</label>
         <input type="text" id="g-subcat" placeholder="Selecione ou digite..." autocomplete="off"
-               onfocus="mostrarSubcatDropdown()" oninput="filtrarSubcatDropdown(this.value)"
+               onfocus="mostrarSubcatDropdown()" oninput="filtrarSubcatDropdown(this.value);atualizarVerbaHint()"
                onblur="setTimeout(fecharSubcatDropdown,150)" />
         <div id="subcat-dropdown" class="subcat-dropdown" style="display:none"></div>
+        <div id="verba-hint" style="display:none;font-size:12px;margin-top:6px"></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Data</label>
@@ -2138,6 +2194,7 @@ function limparFormGasto() {
   const t = document.getElementById('toggle-parc');
   if (t?.checked) { t.checked = false; toggleParc(); }
   atualizarParcPreview();
+  atualizarVerbaHint();
 }
 
 async function addGasto() {
@@ -2241,6 +2298,23 @@ function atualizarSubcatList() {
   const fromSpend = spendingEntries.filter(e => e.category_id===catId && e.subcategory).map(e => e.subcategory);
   _subcatOpts = [...new Set([...fromPlan, ...fromSpend])];
   fecharSubcatDropdown();
+  atualizarVerbaHint();
+}
+
+// Mostra, ao lançar um gasto, quanto ainda resta da verba com o mesmo nome da subcategoria
+function atualizarVerbaHint() {
+  const el = document.getElementById('verba-hint');
+  if (!el) return;
+  const catId = document.getElementById('g-cat')?.value || '';
+  const sub   = normTxt(document.getElementById('g-subcat')?.value?.trim());
+  const v = sub && commitments.find(c => c.recurrence_type === 'verba' && (c.category_id || '') === catId && normTxt(c.name) === sub);
+  if (!v) { el.style.display = 'none'; return; }
+  const resta = Number(v.planned_amount) - gastoDaVerba(v);
+  el.style.display = 'block';
+  el.style.color = resta < 0 ? 'var(--red)' : 'var(--green)';
+  el.textContent = resta < 0
+    ? `Verba "${v.name}": já passou R$ ${fmt(-resta)} do limite de R$ ${fmt(v.planned_amount)}`
+    : `Verba "${v.name}": restam R$ ${fmt(resta)} de R$ ${fmt(v.planned_amount)}`;
 }
 
 function mostrarSubcatDropdown() {
@@ -2267,6 +2341,7 @@ function selecionarSubcat(i) {
   const inp = document.getElementById('g-subcat');
   if (inp && _subcatOpts[i] != null) { inp.value = _subcatOpts[i]; }
   fecharSubcatDropdown();
+  atualizarVerbaHint();
 }
 
 function fecharSubcatDropdown() {
@@ -2846,7 +2921,7 @@ async function montarContextoIA(pergunta, anterior) {
     sobra_real: arred(r.sobraReal), sobra_projetada: arred(r.sobraProjetada),
     folga_media_proximos_6_meses: arred(folgaMedia),
     categorias: categoriasCtx,
-    contas_a_pagar_pendentes: commitments.filter(c => !cobraSozinha(c) && faltaConta(c) > 0.005)
+    contas_a_pagar_pendentes: commitments.filter(c => c.recurrence_type !== 'verba' && !cobraSozinha(c) && faltaConta(c) > 0.005)
       .map(c => ({ conta: c.name, falta: arred(faltaConta(c)), dia: c.due_day })),
     faturas_cartao: faturas,
     projecao_meses: projecao
@@ -2895,7 +2970,10 @@ async function montarContextoIA(pergunta, anterior) {
   // Planejamento do mês: previsto, pago e quanto falta de cada item (onde "Combustível" aparece como item)
   ctx.planejamento_mes = commitments.slice(0, 80).map(c => ({
     item: c.name, categoria: catNome(c.category_id), tipo: c.recurrence_type,
-    previsto: arred(c.planned_amount), pago: arred(c.paid), falta: arred(faltaConta(c))
+    previsto: arred(c.planned_amount),
+    ...(c.recurrence_type === 'verba'
+      ? { gasto_na_verba: arred(gastoDaVerba(c)), resta_na_verba: arred(Number(c.planned_amount) - gastoDaVerba(c)) }
+      : { pago: arred(c.paid), falta: arred(faltaConta(c)) })
   }));
 
   const valor = extrairValor(pergunta);
